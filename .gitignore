@@ -1,0 +1,9 @@
+﻿.cortex/
+.env
+*.env
+*.pem
+*.p8
+connections.toml
+.vscode/
+__pycache__/
+*.log

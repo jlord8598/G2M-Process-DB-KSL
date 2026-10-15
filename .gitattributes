@@ -1,0 +1,6 @@
+# Force LF line endings in the repo and the working copy, on every OS.
+# Snowflake stores procedure text with LF; a CRLF .sql file fails parity.
+* text=auto eol=lf
+*.sql text eol=lf
+*.md  text eol=lf
+*.py  text eol=lf
