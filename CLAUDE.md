@@ -48,15 +48,16 @@ accumulates:** each build adds its lanes' objects alongside every earlier
 build's, and nothing is cleared.
 
 ```
-the owner names the source schema CLN.<SOURCE>, clones it to CLN.<SOURCE>_BUILD
-and grants this build's tables in the clone
-  -> M1 to M6 in DEV_G2M_AI, reading only CLN.<SOURCE>_BUILD
+the owner names the source schema CLN.<SOURCE>, arranges a load freeze on it
+with its owner, and grants this build's tables
+  -> M1 to M6 in DEV_G2M_AI, reading CLN.<SOURCE>
   -> all six checks pass
   -> the owner approves
   -> the owner promotes the code (CLN.UTIL.SPROC_PROMOTE) and inserts
      this build's classifications into the master
   -> the repo is archived (below)
-  -> this build's CLN.<SOURCE>_BUILD grants are revoked; its objects stay in DEV_G2M_AI
+  -> the load freeze ends; this build's CLN.<SOURCE> grants are revoked;
+     its objects stay in DEV_G2M_AI
   -> next build
 ```
 
@@ -76,18 +77,17 @@ never staged and never profiled beyond identifying it.
 **No count is fixed and none is reconciled against.** If the grants change
 mid-build, that is a finding to report, not a check to fail.
 
-**The source is one `CLN` schema, declared per build, and frozen for the whole
-build.** The owner names it at the start (`CLN.CLEAN`, `CLN.BOX_INVESTMENT_DATA`,
-...; called `CLN.<SOURCE>` here) and, before M1, takes a zero-copy clone,
-`create or replace schema CLN.<SOURCE>_BUILD clone CLN.<SOURCE>;`, granting
-this build's tables in it. M1 records the source schema in `docs/sources.md`.
-**Throughout this document, the source `CLN.CLEAN` means that clone:** every
-query and every procedure in the build reads `CLN.<SOURCE>_BUILD`, never the
-live schema, so a reload mid-build cannot move a figure between milestones.
-Write it exactly as `CLN.<SOURCE>_BUILD.` in code, `SOURCE_TABLE` literals
-included: promotion rewrites `CLN.<SOURCE>_BUILD.` to `CLN.<SOURCE>.` in one
-pass, so promoted code reads the live source. M1 records the clone's `created` time; if a table in it
-changes after that, stop and tell the owner (D-43).
+**The source is one `CLN` schema, declared per build, and held still for the
+whole build.** The owner names it at the start (`CLN.CLEAN`,
+`CLN.BOX_INVESTMENT_DATA`, ...; called `CLN.<SOURCE>` here) and arranges a load
+freeze on it with its owner for the length of the build. **Throughout this
+document, the source `CLN.CLEAN` means this build's `CLN.<SOURCE>`**; code
+names it directly. M1 records the source schema and the freeze window in
+`docs/sources.md`, and the `last_altered` time of every in-scope table. **Before
+each milestone's checks, compare `last_altered` with that record; if any table
+changed, stop and tell the owner** — a reload mid-build moves figures between
+milestones and the reconciliation no longer describes one extract. If the
+build will outrun the freeze window, say so at M1 (D-43).
 
 **Nothing is cleared between builds.** Every staging and transformation object
 is lane-named, so a new build's tables and procedures sit beside earlier
@@ -981,7 +981,7 @@ scope entirely (D-03) — no legacy lookup in that schema is consulted.
 
 | Built here | At promotion |
 |---|---|
-| Staging models and `SPROC_STG_{LANE}_MAIN` | Moved whole; `CLN.<SOURCE>_BUILD.` becomes `CLN.<SOURCE>.`. |
+| Staging models and `SPROC_STG_{LANE}_MAIN` | Moved whole. |
 | `SPROC_XFRM_{LANE}` and `SPROC_XFRM_{LANE}_MAIN` | Moved whole; the one marked classification CTE is pointed at the master. |
 | `SPROC_SEM_AI_*` | Moved whole. They union every lane of this process, and `SEM_AI_*` in the target holds nothing else. |
 | The seeder and `SPROC_XREF_{LANE}_MAIN` | Moved whole; each promoted environment seeds its own snapshot. |
@@ -1259,7 +1259,7 @@ USE WAREHOUSE G2M_MCP_AGENT_WH;
 
 | | Where |
 |---|---|
-| **Source data** | `CLN.<SOURCE>_BUILD`, the owner's frozen clone of this build's source schema (§2): the tables assigned to this build's declared lanes. Code never names the live schema. **`CLN.XREF` is not read.** |
+| **Source data** | `CLN.<SOURCE>`, this build's declared source schema, held under a load freeze (§2): the tables assigned to this build's declared lanes. **`CLN.XREF` is not read.** |
 | **Build target** | `DEV_G2M_AI` — schemas `STAGING`, `XREF_SNAPSHOT`, `TRANSFORMATION`, `SEMANTIC` |
 | **Metadata** | `DEV_G2M_AI.INFORMATION_SCHEMA`, `CLN.INFORMATION_SCHEMA`, `SNOWFLAKE.ACCOUNT_USAGE` where granted |
 
@@ -1446,7 +1446,7 @@ and then it changes here, for every build after.
 | D-40 | Line endings | LF everywhere, enforced by `.gitattributes` and checked by `scripts/check_line_endings.py` before parity. |
 | D-41 | Unresolved categories | Never blocking. Unanswered values route to `UNKNOWN`; a status column is an attribute, not a category signal. |
 | D-42 | Accumulation | A build creates and changes only its own lanes' objects. To shared code it only adds: a branch to the seeder and a lane block to each of the six semantic models. Earlier builds' MAINs are never called, and check 5 proves earlier lanes are unchanged. |
-| D-43 | Frozen source | Each build declares one source schema `CLN.<SOURCE>` and reads only `CLN.<SOURCE>_BUILD`, a zero-copy clone the owner takes before M1. Code names `CLN.<SOURCE>_BUILD.`; promotion rewrites it to `CLN.<SOURCE>.`. A change inside the clone mid-build is a stop. |
+| D-43 | Held source | Each build declares one source schema `CLN.<SOURCE>` and reads it directly under a load freeze the owner arranges for the build. M1 records every in-scope table's `last_altered`; a change before any milestone's checks is a stop. |
 
 ### Questions
 

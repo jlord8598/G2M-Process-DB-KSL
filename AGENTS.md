@@ -38,13 +38,13 @@ USE WAREHOUSE G2M_MCP_AGENT_WH;
 | | |
 |---|---|
 | Build target | `DEV_G2M_AI` — schemas `STAGING`, `XREF_SNAPSHOT`, `TRANSFORMATION`, `SEMANTIC` |
-| Source | `CLN.<SOURCE>_BUILD`, the owner's frozen clone of this build's source schema (for example `CLN.BOX_INVESTMENT_DATA_BUILD`): the tables assigned to this build's declared lanes. Code never names the live schema (`CLAUDE.md` D-43). |
+| Source | `CLN.<SOURCE>`, this build's declared source schema (for example `CLN.BOX_INVESTMENT_DATA`), under a load freeze: the tables assigned to this build's declared lanes. A change to any of them mid-build is a stop (`CLAUDE.md` D-43). |
 | Metadata | `DEV_G2M_AI.INFORMATION_SCHEMA`, `CLN.INFORMATION_SCHEMA`, `SNOWFLAKE.ACCOUNT_USAGE` where granted |
 
 **`CLN.XREF` is out of scope.** It is a schema, not a word — a `CLN.CLEAN`
 table whose name contains `XREF` is in scope like any other.
 
-**List `CLN.<SOURCE>_BUILD` at M1, then assign each table to a declared lane or mark it
+**List `CLN.<SOURCE>` at M1, then assign each table to a declared lane or mark it
 out of scope.** A previous build's grants may still be in place, so being able
 to see a table does not put it in scope. The owner confirms the assignment
 before any model is written. `table-usage.md` accounts for every table listed,
@@ -53,7 +53,7 @@ in scope or not.
 ```sql
 select table_schema, table_name, row_count, bytes, last_altered
 from CLN.INFORMATION_SCHEMA.TABLES
-where table_schema = '<SOURCE>_BUILD'
+where table_schema = '<SOURCE>'
 order by table_name;
 ```
 

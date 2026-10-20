@@ -11,8 +11,8 @@ not evidence about this build's sources.**
 
 ## Source schema
 
-`CLN.<SOURCE>`: *(fill at M1)*. Built from the frozen clone
-`CLN.<SOURCE>_BUILD`, cloned at *(created time, fill at M1)* (`CLAUDE.md` D-43).
+`CLN.<SOURCE>`: *(fill at M1)*. Load freeze window: *(fill at M1)*.
+Record every in-scope table's `last_altered` at M1 (`CLAUDE.md` D-43).
 
 ## Lane declaration
 
