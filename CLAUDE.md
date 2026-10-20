@@ -43,17 +43,19 @@ it reconciles.
 ## 2. What a build is
 
 **One build covers one or two companies.** It runs in `DEV_G2M_AI`, is verified
-against all six checks, and is then promoted out manually. `DEV_G2M_AI` is
-cleared before the next build starts.
+against all six checks, and is then promoted out manually. **`DEV_G2M_AI`
+accumulates:** each build adds its lanes' objects alongside every earlier
+build's, and nothing is cleared.
 
 ```
-grant CLN.CLEAN reads for this build's companies
-  -> M1 to M6 in DEV_G2M_AI
+the owner clones CLN.CLEAN to CLN.CLEAN_BUILD and grants this build's tables
+  -> M1 to M6 in DEV_G2M_AI, reading only CLN.CLEAN_BUILD
   -> all six checks pass
   -> the owner approves
-  -> the owner promotes the code and inserts classifications into the master
+  -> the owner promotes the code (CLN.UTIL.SPROC_PROMOTE) and inserts
+     this build's classifications into the master
   -> the repo is archived (below)
-  -> DEV_G2M_AI is cleared and this build's CLN.CLEAN grants are revoked
+  -> this build's CLN.CLEAN_BUILD grants are revoked; its objects stay in DEV_G2M_AI
   -> next build
 ```
 
@@ -73,46 +75,70 @@ never staged and never profiled beyond identifying it.
 **No count is fixed and none is reconciled against.** If the grants change
 mid-build, that is a finding to report, not a check to fail.
 
-**The environment is cleared between builds, not between runs.** Within a build
-the classification table persists across runs, which is what keeps the review
-report stable while work is in progress.
+**The source is frozen for the whole build.** Before M1 the owner takes a
+zero-copy clone, `create or replace schema CLN.CLEAN_BUILD clone CLN.CLEAN;`,
+and grants this build's tables in it. **Throughout this document, the source
+`CLN.CLEAN` means that clone:** every query and every procedure in the build
+reads `CLN.CLEAN_BUILD`, never `CLN.CLEAN`, so a reload of the live source
+mid-build cannot move a figure between milestones. Write it exactly as
+`CLN.CLEAN_BUILD.` in code, `SOURCE_TABLE` literals included: promotion
+rewrites `CLN.CLEAN_BUILD.` to `CLN.CLEAN.` in one pass, so promoted code reads
+the live source. M1 records the clone's `created` time; if a table in it
+changes after that, stop and tell the owner (D-43).
 
-**The repo is archived too, and for the same reason.** Before a new build
+**Nothing is cleared between builds.** Every staging and transformation object
+is lane-named, so a new build's tables and procedures sit beside earlier
+builds' without collision. Three things are shared and grow by one piece per
+lane: the classification table (rows keyed by `SOURCE_LANE`), the seeder (one
+derivation branch per lane) and the six semantic models (one lane block each).
+`SPROC_SEM_AI_MAIN` stays a `CREATE OR REPLACE` union of every lane's
+transformation tables, earlier builds' included.
+
+**A build changes only its own lanes.** It never edits, redeploys, drops or
+calls another build's staging or transformation objects, never edits another
+lane's seeder branch or semantic lane block, and never deletes or updates
+another lane's classification rows. Earlier builds' `CLN.CLEAN` grants are
+revoked, so their MAINs cannot run and are never called. Adding a branch to
+the seeder and a block to each semantic model is the only change a build makes
+to code that serves other lanes.
+
+**The build's records are archived; its code is not.** Before a new build
 starts, move into `docs/completed-builds/<build-name>/`:
 
 - the whole of `docs/findings/`
 - `docs/sources.md`
-- **everything under `sql/`**: every MAIN, model and seeder
 - `scripts/run_build.sql` and each `scripts/reconcile_{LANE}.sql`
 
-**What stays** is only what no build changes: `scripts/parity_check.py`,
-`scripts/check_line_endings.py`, `scripts/probes/SPROC_PROBE_FAULT.sql` (the
-parity self-test's probe, never deployed), `.gitattributes`, and these
-documents.
-`sql/` is empty between builds. Each build writes its own MAINs, seeder,
-semantic models and `run_build.sql` from this document.
-Nothing is stripped and carried over, so nothing from another company can
-survive into the next build.
+**`sql/` stays.** It matches what is deployed in `DEV_G2M_AI`, every lane of
+every build, and parity checks all of it. **What else stays** is what no build
+changes: `scripts/parity_check.py`, `scripts/check_line_endings.py`,
+`scripts/probes/SPROC_PROBE_FAULT.sql` (the parity self-test's probe, never
+deployed), `.gitattributes`, and these documents. Each build writes its own
+lanes' MAINs and models and its own `run_build.sql`, and adds its branches to
+the seeder and its blocks to the six semantic models.
 
 **The owner does the archive, not the agent.** It happens between builds, when
 no build is running, and it is the one operation that moves a `docs/findings/`
 memo — which `AGENTS.md` otherwise forbids touching. **M1 confirms it has
 happened before doing anything else:** `docs/findings/` should be empty,
-`docs/sources.md` a blank template, `sql/` empty, and `scripts/` holding only
-`parity_check.py`, `check_line_endings.py` and `probes/SPROC_PROBE_FAULT.sql`. **If
+`docs/sources.md` a blank template, `scripts/` holding only `parity_check.py`,
+`check_line_endings.py` and `probes/SPROC_PROBE_FAULT.sql`, every lane found
+under `sql/` or as a `SOURCE_LANE` in `DEV_G2M_AI` recorded in
+`docs/completed-builds/`, and a parity check of `sql/` against `DEV_G2M_AI`
+clean. **If
 `docs/completed-builds/` does not exist, this is the first build; say so and
 continue.** **If anything else is still populated, stop and tell the owner** —
 a half-archived repo produces a build that silently rebuilds someone else's
 company.
-**Leave the old build in place and two things break:** a new `M1.md` would
-overwrite a memo `AGENTS.md` forbids touching, and parity reports every
-orphaned procedure as a stray file.
+**Leave the old records in place and a new `M1.md` would overwrite a memo
+`AGENTS.md` forbids touching.**
 
 **Lane names must be unique across every build, not just within one.** The
 master accumulates rows keyed by lane, so two companies both declaring a lane
 called `GL` collide there and neither can be separated afterwards. At M1, check
-the proposed names against `docs/completed-builds/` and tell the owner what you
-found. **Checking the master is the owner's job**, not yours — the pipeline
+the proposed names against `docs/completed-builds/` and against the
+`SOURCE_LANE` values already in `DEV_G2M_AI` (the classification table and the
+six semantic tables), and tell the owner what you found. **Checking the master is the owner's job**, not yours — the pipeline
 never reads it (§7, D-03). Do not build until the owner confirms the names are
 free.
 
@@ -151,7 +177,7 @@ seed reads `STAGING` only** — which is why source dictionaries get staging
 models alongside the facts.
 
 **Staging carries the raw join keys through** — site code, department, account,
-statistic account, the lane's line identifier, the record-type discriminator. A
+statistic account, `SOURCE_ITEM_ID`, the lane's line identifier, the record-type discriminator. A
 key dropped in staging cannot be recovered downstream.
 
 ### Staging is lossless
@@ -263,19 +289,26 @@ points that one CTE at the master, a one-line change.
 | Object | Pattern |
 |---|---|
 | Per-source orchestrator | `SPROC_{STG\|XREF\|XFRM}_{LANE}_MAIN` |
-| Semantic orchestrator | `SPROC_SEM_MAIN`, one, shared by every lane |
-| Seeder | `SPROC_XREF_ACCOUNT_CLASSIFICATION`, one per build, named for its table |
-| Model procedure | `SPROC_{STG\|XFRM\|SEM}_{SUBJECT}` |
-| Staging table | `STG_{LANE}_{SUBJECT}`, or `STG_SHARED_{SUBJECT}` for a dictionary serving more than one lane |
+| Semantic orchestrator | `SPROC_SEM_AI_MAIN`, one, shared by every lane |
+| Seeder | `SPROC_XREF_ACCOUNT_CLASSIFICATION`, one for the environment, named for its table |
+| Model procedure | `SPROC_{STG\|XFRM}_{SUBJECT}`, or `SPROC_SEM_AI_{SUBJECT}` in `SEMANTIC` |
+| Staging table | `STG_{LANE}_{SUBJECT}`, dictionaries included |
 | Transformation table | `XFRM_{LANE}_{STREAM}` |
-| Semantic table | `SEM_{SUBJECT}` |
+| Semantic table | `SEM_AI_{SUBJECT}` |
+
+**Semantic objects carry the `AI` infix** (`SEM_AI_*`, `SPROC_SEM_AI_*`) so they
+read as the same objects in `DEV_G2M_AI` and in the promoted database, where
+other semantic objects exist without it.
 
 `{LANE}` is whatever the owner declared at M1. Streams are
 `INCOME_STATEMENT`, `BALANCE_SHEET`, `OPERATING_METRICS`, `PACING`, `UNKNOWN`. No `_OLD`,
 `_NEW`, `_BKUP`, no dated copies.
 
-**Where one source system feeds two lanes**, their shared dictionaries are
-staged **once** as `STG_SHARED_*`, not copied per lane.
+**A dictionary serving more than one lane is staged once per lane**, as
+`STG_{LANE}_{SUBJECT}`, losslessly each time. Shared staging names would
+collide across builds in an environment that accumulates (D-42). The existing
+`STG_SHARED_CHART_OF_ACCOUNTS` belongs to the build that created it; no later
+build reuses or redefines it.
 
 ### Orchestration: per-source MAINs, not a cascade
 
@@ -285,10 +318,10 @@ sequence: STG, then XREF, then XFRM, then SEM.
 
 | Schema | Orchestrator | Calls |
 |---|---|---|
-| `STAGING` | `SPROC_STG_{LANE}_MAIN` | every staging model for that lane, plus any `STG_SHARED_*` model the lane uses |
+| `STAGING` | `SPROC_STG_{LANE}_MAIN` | every staging model for that lane |
 | `XREF_SNAPSHOT` | `SPROC_XREF_{LANE}_MAIN` | the seeder with that lane (`P_LANE`), then the three review views |
 | `TRANSFORMATION` | `SPROC_XFRM_{LANE}_MAIN` | `SPROC_XFRM_{LANE}` |
-| `SEMANTIC` | `SPROC_SEM_MAIN` | the six semantic models, which union every lane |
+| `SEMANTIC` | `SPROC_SEM_AI_MAIN` | the six semantic models, which union every lane |
 
 **Semantic is shared, not per-source.** The six semantic models are the one
 place every source comes together, so they have one MAIN. Transformation is
@@ -301,9 +334,10 @@ shared staging model called by two lanes' MAINs is deterministic and rebuilds
 identically.
 
 **`scripts/run_build.sql` is a test harness, not part of the pipeline.** A
-script under `scripts/`, never deployed, so parity never sees it. It calls each
-MAIN in sequence and stops at the first failure, so checks 5 and 6 can run the
-whole build in one step.
+script under `scripts/`, never deployed, so parity never sees it. It calls this
+build's lanes' MAINs and then `SPROC_SEM_AI_MAIN`, in sequence, and stops at the
+first failure, so checks 5 and 6 can run the whole build in one step. It never
+calls an earlier build's MAINs.
 
 **Nothing catches exceptions.** Not the models, not the MAINs. A failure
 propagates out of the MAIN unchanged, so whatever called it stops and the
@@ -346,7 +380,7 @@ then fails on a procedure whose logic is correct.
 sql/staging/          staging models and each SPROC_STG_{LANE}_MAIN
 sql/xref_snapshot/    the seeder and each SPROC_XREF_{LANE}_MAIN
 sql/transformation/   the lane models and each SPROC_XFRM_{LANE}_MAIN
-sql/semantic/         semantic models and SPROC_SEM_MAIN
+sql/semantic/         semantic models and SPROC_SEM_AI_MAIN
 scripts/              parity_check.py and check_line_endings.py (permanent);
                       run_build.sql and reconcile_{LANE}.sql (per build)
 .gitattributes        forces LF line endings (repo root)
@@ -369,9 +403,9 @@ seems to require a different one, the transformation layer has not finished its
 job.
 
 ```
-SEM_INCOME_STATEMENT_ACTUAL      SEM_BALANCE_SHEET
-SEM_INCOME_STATEMENT_BUDGET      SEM_OPERATING_METRICS
-SEM_INCOME_STATEMENT_FORECAST    SEM_UNKNOWN
+SEM_AI_INCOME_STATEMENT_ACTUAL      SEM_AI_BALANCE_SHEET
+SEM_AI_INCOME_STATEMENT_BUDGET      SEM_AI_OPERATING_METRICS
+SEM_AI_INCOME_STATEMENT_FORECAST    SEM_AI_UNKNOWN
 ```
 
 ### One row per source line
@@ -384,12 +418,12 @@ That is what makes the completeness claim provable by counting:
 ```sql
 -- per lane, every run, exact; fact staging only. Pacing staging rows
 -- equal XFRM_{LANE}_PACING instead, which has no semantic table.
-fact staging rows  =  SEM_INCOME_STATEMENT_ACTUAL
-              +  SEM_INCOME_STATEMENT_BUDGET
-              +  SEM_INCOME_STATEMENT_FORECAST
-              +  SEM_BALANCE_SHEET
-              +  SEM_OPERATING_METRICS
-              +  SEM_UNKNOWN
+fact staging rows  =  SEM_AI_INCOME_STATEMENT_ACTUAL
+              +  SEM_AI_INCOME_STATEMENT_BUDGET
+              +  SEM_AI_INCOME_STATEMENT_FORECAST
+              +  SEM_AI_BALANCE_SHEET
+              +  SEM_AI_OPERATING_METRICS
+              +  SEM_AI_UNKNOWN
 ```
 
 ### Common columns
@@ -489,17 +523,17 @@ Appended in the order shown, after the common block.
 | Table | Adds, in order |
 |---|---|
 | The three income statement tables | `VALUE_SIGN NUMBER(2,0)`, `VALUE FLOAT` |
-| `SEM_BALANCE_SHEET` | `VALUE_SIGN NUMBER(2,0)`, `VALUE FLOAT` — both null unless someone signs balance sheet accounts. Carried for shape consistency; do not read them as a measure. |
-| `SEM_OPERATING_METRICS` | `METRIC_UNIT VARCHAR`, `AGGREGATION_TYPE VARCHAR` — and **no** `VALUE_SIGN` or `VALUE`. A count has no polarity. The measure is `STAT_VALUE` from the common block, except on a classifier override (§5), where an amount row lands here with `STAT_VALUE` null and its number in `SOURCE_AMOUNT`. |
-| `SEM_UNKNOWN` | `UNKNOWN_REASON VARCHAR` — `UNCLASSIFIED_ACCOUNT`, `UNRESOLVED_CATEGORY` or `BOTH` — then `UNRESOLVED_CATEGORY_VALUE VARCHAR`, `METRIC_UNIT VARCHAR`, `AGGREGATION_TYPE VARCHAR`, all nullable. |
+| `SEM_AI_BALANCE_SHEET` | `VALUE_SIGN NUMBER(2,0)`, `VALUE FLOAT` — both null unless someone signs balance sheet accounts. Carried for shape consistency; do not read them as a measure. |
+| `SEM_AI_OPERATING_METRICS` | `METRIC_UNIT VARCHAR`, `AGGREGATION_TYPE VARCHAR` — and **no** `VALUE_SIGN` or `VALUE`. A count has no polarity. The measure is `STAT_VALUE` from the common block, except on a classifier override (§5), where an amount row lands here with `STAT_VALUE` null and its number in `SOURCE_AMOUNT`. |
+| `SEM_AI_UNKNOWN` | `UNKNOWN_REASON VARCHAR` — `UNCLASSIFIED_ACCOUNT`, `UNRESOLVED_CATEGORY` or `BOTH` — then `UNRESOLVED_CATEGORY_VALUE VARCHAR`, `METRIC_UNIT VARCHAR`, `AGGREGATION_TYPE VARCHAR`, all nullable. |
 
 **`CATEGORY` and `H1`–`H5` are null only where they genuinely did not resolve.**
-In `SEM_UNKNOWN` that means `CATEGORY` is null on an `UNRESOLVED_CATEGORY` or
+In `SEM_AI_UNKNOWN` that means `CATEGORY` is null on an `UNRESOLVED_CATEGORY` or
 `BOTH` row and **populated on an `UNCLASSIFIED_ACCOUNT` row**, whose category
 resolved fine; `H1`–`H5` are the other way round. Nulling a column because of
 the table it is in throws away work that was done.
 
-### `SEM_UNKNOWN`
+### `SEM_AI_UNKNOWN`
 
 **Every record that reached no classified stream, with a stated reason, and
 carrying whatever did resolve.** It is a destination, not a failure.
@@ -541,12 +575,12 @@ own structure. That is its whole job.
 
 **Nobody edits it in `DEV_G2M_AI`.** `REVIEW_STATUS` is always `UNREVIEWED`
 here. Human correction happens after promotion, in the master table (§7), and
-**nothing flows back** — a later build starts from a clean environment and
-re-derives from scratch.
+**nothing flows back** — a later build seeds only its own lanes and never
+reads the master.
 
-**It persists across runs within a build**, which is what keeps the review
-report stable while work is in progress. It does not survive the environment
-being cleared between builds.
+**It persists across runs and across builds**, one set of rows per lane, which
+is what keeps the review report stable. A build's seeder calls touch only its
+own lanes' rows.
 
 ### The key — five parts, unique
 
@@ -562,12 +596,16 @@ row resolves to exactly one classification row.
 ```sql
 ACCOUNT_KEY = coalesce( nullif(trim(ACCOUNT_NUMBER), '')
                       , nullif(trim(STAT_ACCOUNT),   '')
+                      , nullif(trim(SOURCE_ITEM_ID), '')
                       , '~BLANK~' )
 ```
 
-The raw columns are both carried through unchanged alongside it. Falling back
-to the statistic account is not invention — it is the source's own identifier
-for rows that have no other. Without it, every blank-account row on a site and
+`SOURCE_ITEM_ID` is the lane's own line-item identifier (an item tag, a pay
+label), established per lane at M1 and recorded in `docs/sources.md`; null on a
+lane that has none. It is a staging column only. The raw columns are all
+carried through unchanged alongside the key. Falling back to the statistic
+account or the item identifier is not invention — each is the source's own
+identifier for rows that have no other. Without it, every blank-account row on a site and
 department collapses to one key, and a measure split across many statistic
 segments resolves to a single classification with a single unit.
 
@@ -815,8 +853,9 @@ Four steps, in order, every run.
 4. **Join and route.** Transformation left-joins on the five-part key, appends
    the classification, applies the sign, routes on `H1`.
 
-**One seeder per build**, `SPROC_XREF_ACCOUNT_CLASSIFICATION(P_RUN_ID,
-P_LANE)`, with one derivation branch per lane. Each lane's XREF MAIN calls it
+**One seeder for the environment**, `SPROC_XREF_ACCOUNT_CLASSIFICATION(P_RUN_ID,
+P_LANE)`, with one derivation branch per lane. Each build adds its lanes'
+branches and leaves existing branches untouched. Each lane's XREF MAIN calls it
 with its own lane, so a call seeds only that lane's keys.
 
 **Classification derivation exists only in step 2**, once per new key. It never
@@ -908,6 +947,28 @@ across every company, and is where people correct and complete the hierarchy.
 record type — matching the build's classification table exactly, so a row
 inserted from a build lands at the same grain it was produced at.
 
+**Its columns are every column of `XREF_ACCOUNT_CLASSIFICATION` (§5), same
+names, plus five for review and promotion.** A transformation procedure reads
+the master by name once promoted, so a classification column missing here
+breaks it.
+
+```sql
+KSL_MASTER_ACCOUNT_HIERARCHY
+  SOURCE_LANE, SOURCE_SITE_CODE, DEPARTMENT, ACCOUNT_KEY, RECORD_TYPE   -- key
+  ASSET_NAME, DEPARTMENT_NAME, ACCOUNT_NUMBER, STAT_ACCOUNT, ACCOUNT_DESC
+  H1, H2, H3, H4, H5, P_L_SECTION, NORMAL_BALANCE, VALUE_SIGN
+  METRIC_UNIT, AGGREGATION_TYPE, REVIEW_STATUS, SEED_SOURCE
+  FIRST_SEEN_RUN_ID, LAST_SEEN_RUN_ID
+  REVIEWED_BY           VARCHAR         -- review: who corrected the row
+  REVIEWED_AT           TIMESTAMP_LTZ   -- review: when
+  PROMOTED_FROM_RUN_ID  VARCHAR         -- promotion: the run the key came from
+  PROMOTED_AT           TIMESTAMP_LTZ   -- promotion: when it was inserted
+  LAST_UPDATED_AT       TIMESTAMP_LTZ   -- any change to the row
+```
+
+A change to the classification table's columns is a change to the master's
+too, made by the owner before the next promotion.
+
 **Promotion is manual and one-way.** The owner moves the code to its permanent
 home and inserts this build's classifications into the master. **The build
 environment never reads or writes that table.** `CLN.XREF` is otherwise out of
@@ -917,11 +978,16 @@ scope entirely (D-03) — no legacy lookup in that schema is consulted.
 
 | Built here | At promotion |
 |---|---|
-| Staging models and `SPROC_STG_{LANE}_MAIN` | Moved whole. |
+| Staging models and `SPROC_STG_{LANE}_MAIN` | Moved whole; `CLN.CLEAN_BUILD.` becomes `CLN.CLEAN.`. |
 | `SPROC_XFRM_{LANE}` and `SPROC_XFRM_{LANE}_MAIN` | Moved whole; the one marked classification CTE is pointed at the master. |
-| Each semantic model's lane block | Lifted out and pasted into the master semantic model as one more `UNION ALL` branch. |
-| `XREF_ACCOUNT_CLASSIFICATION` rows | Inserted into the master. Snowflake does not enforce the master's primary key, so the insert checks for existing keys itself. |
-| The seeder, `SPROC_XREF_{LANE}_MAIN`, the review views, `scripts/run_build.sql` | Build tools. Whether any runs in the promoted environment is the owner's decision. |
+| `SPROC_SEM_AI_*` | Moved whole. They union every lane of this process, and `SEM_AI_*` in the target holds nothing else. |
+| The seeder and `SPROC_XREF_{LANE}_MAIN` | Moved whole; each promoted environment seeds its own snapshot. |
+| `XREF_ACCOUNT_CLASSIFICATION` rows | Inserted into the master by the owner at the build's first promotion, checking for existing keys (Snowflake does not enforce the master's primary key). After that, `CLN.UTIL.SPROC_RUN_PIPELINE` inserts each run's new keys itself. |
+| `scripts/run_build.sql` | Build tool; not promoted. A promoted environment runs through `CLN.UTIL.SPROC_RUN_PIPELINE`. |
+
+`CLN.UTIL.SPROC_PROMOTE(FROM, TO, DRY_RUN)` does every code move above, along
+the allowed paths only. Neither utility is part of a build, and the agent
+never calls either.
 
 **The master is a worklist, not verified truth.** Everything the pipeline sends
 it is a machine-derived best guess. Its value is that every combination is
@@ -1005,10 +1071,10 @@ Every one must return zero. **The object column matters:**
 | d | No key carries more than one `METRIC_UNIT`, or more than one `AGGREGATION_TYPE` | `XREF_SNAPSHOT` |
 | e | No row in a stream whose `H1` does not route there | the four `H1`-routed `XFRM` streams; `PACING` is exempt, it routes on source |
 | f | No row with `H1 = 'Statistic'` and a non-null `VALUE_SIGN` | `XREF_SNAPSHOT` and `XFRM` |
-| g | No row in `SEM_INCOME_STATEMENT_<CAT>` whose `CATEGORY <> '<CAT>'` | `SEMANTIC` |
+| g | No row in `SEM_AI_INCOME_STATEMENT_<CAT>` whose `CATEGORY <> '<CAT>'` | `SEMANTIC` |
 | h | No row where `SOURCE_AMOUNT` and `VALUE_SIGN` are **both** non-null and `VALUE` is null or differs from the product beyond `0.005`; and none where `VALUE` is non-null while `VALUE_SIGN` is null | `SEMANTIC` |
 | i | No row with a null `SOURCE_TABLE` | `SEMANTIC` |
-| j | No row where `UNRESOLVED_CATEGORY_VALUE` is null while `UNKNOWN_REASON` is `UNRESOLVED_CATEGORY` or `BOTH`, or non-null otherwise | `SEM_UNKNOWN` |
+| j | No row where `UNRESOLVED_CATEGORY_VALUE` is null while `UNKNOWN_REASON` is `UNRESOLVED_CATEGORY` or `BOTH`, or non-null otherwise | `SEM_AI_UNKNOWN` |
 | k | Of rows whose `H2` appears in the standard hierarchy, none whose `P_L_SECTION` or `NORMAL_BALANCE` disagrees with it; and of rows whose `H2` does not, none with either column non-null | `XREF_SNAPSHOT` and `SEMANTIC` |
 | l | No row whose `VALUE_SIGN` disagrees with its `NORMAL_BALANCE` | `XREF_SNAPSHOT` |
 
@@ -1100,6 +1166,11 @@ a defect** — there is no known-benign category to dismiss it into.
 **The classification table needs its own assertion:** a second run inserts zero
 rows and changes no classification value.
 
+**Earlier builds need their own assertion:** every earlier lane's staging and
+transformation tables, and its rows in the classification table and the six
+semantic tables, hash identically before this build's first run and after its
+last. That is the evidence a build touched only its own lanes.
+
 ### 6. Fault propagation
 
 A success return proves only that the procedure ran — `QUERY_HISTORY` does not
@@ -1185,7 +1256,7 @@ USE WAREHOUSE G2M_MCP_AGENT_WH;
 
 | | Where |
 |---|---|
-| **Source data** | `CLN.CLEAN`, the tables assigned to this build's declared lanes (§2). **`CLN.XREF` is not read.** |
+| **Source data** | `CLN.CLEAN_BUILD`, the owner's frozen clone of `CLN.CLEAN` (§2): the tables assigned to this build's declared lanes. Code never names `CLN.CLEAN`. **`CLN.XREF` is not read.** |
 | **Build target** | `DEV_G2M_AI` — schemas `STAGING`, `XREF_SNAPSHOT`, `TRANSFORMATION`, `SEMANTIC` |
 | **Metadata** | `DEV_G2M_AI.INFORMATION_SCHEMA`, `CLN.INFORMATION_SCHEMA`, `SNOWFLAKE.ACCOUNT_USAGE` where granted |
 
@@ -1242,8 +1313,8 @@ Approval at a stop covers every phase up to the next stop, DDL included.
 | Phase | Do | Milestone |
 |---|---|---|
 | **M1. Analysis** | **Confirm the repo is archived (§2) before anything else.** List every granted `CLN.CLEAN` table and propose how they group into lanes, without naming them. **Stop (stop 1): the owner names the lanes and confirms which tables are in scope.** Check each name against `docs/completed-builds/` and report; the owner confirms it is unused in the master (D-32). Profile the in-scope tables. Establish per lane: `RECORD_TYPE` derivation, `ACCOUNT_KEY` composition, the section or dictionary giving `H1`/`H2`, statistic unit vocabulary, category derivation, `SOURCE_LINE_KEY`, period derivation, **how the source marks its own subtotal and rollup rows, and how its accounts map onto the standard hierarchy**. Write `docs/sources.md`. No DDL. | Findings, the lane declaration, and `docs/findings/open-questions.md` |
-| **M2. Skeleton** | Four schemas. Per lane, the three per-source MAINs with zero model calls; `SPROC_SEM_MAIN` with zero; `scripts/run_build.sql`. Confirm `.gitattributes`, `scripts/check_line_endings.py` and `scripts/parity_check.py` are present, and run the parity check's six-fault self-test. | `run_build.sql` runs it; line-ending check clean; checks 4 and 6 pass |
-| **M3. Staging** | One model per source subject — facts, pacing and dictionaries alike — plus `STG_SHARED_*` where a dictionary serves more than one lane. Lossless. | Checks 1, 3, 4, 5 pass; identity form stated per model; the output profile (§9, the blind spot) compared with `sources.md` |
+| **M2. Skeleton** | Four schemas, created if not present. Per lane, the three per-source MAINs with zero model calls; `SPROC_SEM_AI_MAIN` with zero calls if it does not yet exist, otherwise left as it is until M6; `scripts/run_build.sql`. Confirm `.gitattributes`, `scripts/check_line_endings.py` and `scripts/parity_check.py` are present, and run the parity check's six-fault self-test. | `run_build.sql` runs it; line-ending check clean; checks 4 and 6 pass |
+| **M3. Staging** | One model per source subject — facts, pacing and dictionaries alike — dictionaries staged per lane even where several lanes share one. Lossless. | Checks 1, 3, 4, 5 pass; identity form stated per model; the output profile (§9, the blind spot) compared with `sources.md` |
 | **M4. Classification** | The seeder, the table, the three review views | Check 2(a)–(d), (f), (k), (l); checks 4 and 5 including the classification assertion; the review report |
 | **M5. Transformation** | One procedure per lane, five streams each | Check 1 partition per lane; checks 2(e), 2(f), 3, 4, 5; the four lists; `RECORD_TYPE`/`H1` disagreements |
 | **M6. Semantic** | Six tables, lanes unioned in marked lane blocks | All six checks; five documents; `scripts/reconcile_{LANE}.sql` run with zero failures |
@@ -1335,7 +1406,7 @@ and then it changes here, for every build after.
 | D-03 | `CLN.XREF` | Not read by the pipeline, ever. Classification is derived from the staged source. The master table in that schema is written by promotion only, outside the build. |
 | D-04 | The classifier | `XREF_ACCOUNT_CLASSIFICATION` is the only classifier. Derivation proposes at insert; after insert a row is never re-proposed. No runtime precedence exists and none is to be built. |
 | D-05 | Classification grain | Five parts: lane, site, department, `ACCOUNT_KEY`, `RECORD_TYPE`. Unique. No wildcards, no inheritance, no precedence. |
-| D-06 | `ACCOUNT_KEY` | `coalesce(nullif(trim(ACCOUNT_NUMBER),''), nullif(trim(STAT_ACCOUNT),''), '~BLANK~')`, built in staging, raw columns carried alongside. The `nullif(trim())` is not optional — without it an empty string becomes the key instead of the sentinel. No lane-specific exception. |
+| D-06 | `ACCOUNT_KEY` | `coalesce(nullif(trim(ACCOUNT_NUMBER),''), nullif(trim(STAT_ACCOUNT),''), nullif(trim(SOURCE_ITEM_ID),''), '~BLANK~')`, built in staging, raw columns carried alongside. `SOURCE_ITEM_ID` is the lane's own line-item identifier, declared at M1, null where the lane has none. The `nullif(trim())` is not optional — without it an empty string becomes the key instead of the sentinel. No lane-specific exception. |
 | D-07 | `RECORD_TYPE` | In the key, normalised in staging. Where a lane does not state it, staging derives it — the one declared exception to staging doing no classification — and records the rule in `RECORD_TYPE_SOURCE`. |
 | D-08 | Blank key parts | `'~BLANK~'`, identical expression at seed and at join. |
 | D-09 | `H1` | The statement. Seven values, exhaustive, never null, and the only thing that routes a row. |
@@ -1344,7 +1415,7 @@ and then it changes here, for every build after.
 | D-12 | `P_L_SECTION` and `NORMAL_BALANCE` | A fixed function of `H2`, never guessed independently and never set per account. Asserted by check 2(k). |
 | D-13 | Polarity | `VALUE_SIGN` follows `NORMAL_BALANCE`: Credit `+1`, Debit `-1`, Mixed null, and null outside the income statement. `SOURCE_AMOUNT` is carried as booked with the source's own signs; `VALUE` is null wherever the sign is. |
 | D-14 | The merge | Insert-only on classification columns; an existing key has only `LAST_SEEN_RUN_ID` updated. `CREATE TABLE IF NOT EXISTS` precedes it every run. |
-| D-15 | Persistence | The classification table persists across runs **within a build**, which keeps the review report stable. It does not survive the environment being cleared between builds, and nothing is ever read back into it. |
+| D-15 | Persistence | The classification table persists across runs **and across builds**, one set of rows per lane, which keeps the review report stable. A build seeds only its own lanes, and nothing is ever read back into it. |
 | D-16 | Category | A column in transformation. In semantic the income statement splits into three tables by category; balance sheet and operating metrics each carry `CATEGORY` in one table. |
 | D-17 | Scenario | Never flattened, never merged, always verbatim. An unresolved category sends the whole row to `UNKNOWN`. |
 | D-18 | Statistics | No sign, no `VALUE`. The statistic measure is `STAT_VALUE`; there is no separate metric value column. |
@@ -1355,22 +1426,24 @@ and then it changes here, for every build after.
 | D-23 | Transformation procedures | One per lane, five tables from one join, reading the classification in one marked CTE so promotion swaps it in one line. |
 | D-24 | Pacing and pickup | Their own transformation stream, routed on source rather than `H1`, counted in the partition, and ending at transformation with no semantic model. Not `UNKNOWN`, which is a queue that should shrink. M1 establishes whether an as-of date exists; where it does not, the stream is still built and the memo states what the source would need to supply. |
 | D-25 | Duplicates and subtotals | Kept everywhere. Duplicate extracts are tagged with `SOURCE_TABLE`; the source's own total and rollup rows are tagged with `IS_SUBTOTAL`, set in staging per row with the rule recorded in `SUBTOTAL_SOURCE`. Nothing is removed, and no computed measure is stored. Deduplication is a decision and this build makes none. |
-| D-26 | Dictionaries | Staged like facts, so the seed reads `STAGING` only. Shared dictionaries staged once as `STG_SHARED_*`. |
+| D-26 | Dictionaries | Staged like facts, so the seed reads `STAGING` only. Staged per lane as `STG_{LANE}_*`, even when several lanes share one; no new `STG_SHARED_*` objects. |
 | D-27 | `RUN_ID` | Stamped by each MAIN when it starts and passed to the procedures it calls. MAINs take no parameters. On every table except the classification table, which carries `FIRST_SEEN_RUN_ID` and `LAST_SEEN_RUN_ID` instead. The only run stamp. |
 | D-28 | Schemas | `STAGING`, `XREF_SNAPSHOT`, `TRANSFORMATION`, `SEMANTIC` in `DEV_G2M_AI`. `XREF_SNAPSHOT` is a standard dual-purpose schema in the process databases. |
 | D-29 | `STAT_UNIT_FAMILY` | Where a lane carries a statistic value alongside a money amount on one row, staging derives a `STAT_UNIT_FAMILY` attribute from the statistic account. It is not `METRIC_UNIT` and does not change the key or the routing. Retyping such rows as `STATISTIC` is rejected: it routes rows carrying real P&L amounts out of the income statement. |
 | D-30 | `AGGREGATION_TYPE` seeding | From the source where the source states it; `UNRATIFIED` only where nothing is known. |
 | D-31 | The master table | `CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY` carries the full five-part key including `RECORD_TYPE` and `SOURCE_LANE`, matching the build's grain exactly. |
-| D-32 | Lanes | Declared per build by the owner at M1. Never hard-coded in these documents, never inferred from a source system's name. **A lane name must be unique across every build ever run**, because the master is keyed by lane and two builds sharing a name collide there irreversibly. M1 checks the proposed names against `docs/completed-builds/` and reports; the owner checks the master and confirms. |
+| D-32 | Lanes | Declared per build by the owner at M1. Never hard-coded in these documents, never inferred from a source system's name. **A lane name must be unique across every build ever run**, because the master is keyed by lane and two builds sharing a name collide there irreversibly. M1 checks the proposed names against `docs/completed-builds/` and the `SOURCE_LANE` values in `DEV_G2M_AI`, and reports; the owner checks the master and confirms. |
 | D-33 | The one-way loop | Nobody edits the classification table in `DEV_G2M_AI`. `REVIEW_STATUS` is always `UNREVIEWED` there. Human correction happens in the master after promotion and never flows back. |
-| D-34 | Environment lifecycle | `DEV_G2M_AI` is cleared between builds, not between runs. Promotion is manual and the agent does not perform it. |
-| D-35 | Orchestration | One MAIN per lane in each of `STAGING`, `XREF_SNAPSHOT` and `TRANSFORMATION`; one shared `SPROC_SEM_MAIN`. No MAIN calls another; each runs on its own, in sequence. Nothing catches exceptions. |
+| D-34 | Environment lifecycle | `DEV_G2M_AI` accumulates: nothing is cleared between builds, and `sql/` stays with it. Only a build's records are archived. Promotion is manual and the agent does not perform it. |
+| D-35 | Orchestration | One MAIN per lane in each of `STAGING`, `XREF_SNAPSHOT` and `TRANSFORMATION`; one shared `SPROC_SEM_AI_MAIN`. No MAIN calls another; each runs on its own, in sequence. Nothing catches exceptions. |
 | D-36 | Semantic lane blocks | Each semantic model is a `UNION ALL` of self-contained blocks marked `BEGIN LANE` / `END LANE`, so a lane's block can be pasted into the master semantic model unchanged. |
 | D-37 | Pacing and the seeder | Pacing tables never feed the seeder, and their code columns are never mapped to `ACCOUNT_NUMBER`. |
 | D-38 | Labels and units | No invented labels. A statistic's `H2` is the source's stated family or its own code; `METRIC_UNIT` is null unless the source states a unit. |
-| D-39 | The seeder | One per build, `SPROC_XREF_ACCOUNT_CLASSIFICATION(P_RUN_ID, P_LANE)`, named for its table, one derivation branch per lane. |
+| D-39 | The seeder | One for the environment, `SPROC_XREF_ACCOUNT_CLASSIFICATION(P_RUN_ID, P_LANE)`, named for its table, one derivation branch per lane. A build adds its own lanes' branches and changes no other. |
 | D-40 | Line endings | LF everywhere, enforced by `.gitattributes` and checked by `scripts/check_line_endings.py` before parity. |
 | D-41 | Unresolved categories | Never blocking. Unanswered values route to `UNKNOWN`; a status column is an attribute, not a category signal. |
+| D-42 | Accumulation | A build creates and changes only its own lanes' objects. To shared code it only adds: a branch to the seeder and a lane block to each of the six semantic models. Earlier builds' MAINs are never called, and check 5 proves earlier lanes are unchanged. |
+| D-43 | Frozen source | A build reads only `CLN.CLEAN_BUILD`, a zero-copy clone of `CLN.CLEAN` the owner takes before M1. Code names `CLN.CLEAN_BUILD.`; promotion rewrites it to `CLN.CLEAN.`. A change inside the clone mid-build is a stop. |
 
 ### Questions
 

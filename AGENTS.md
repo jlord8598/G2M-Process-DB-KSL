@@ -38,13 +38,13 @@ USE WAREHOUSE G2M_MCP_AGENT_WH;
 | | |
 |---|---|
 | Build target | `DEV_G2M_AI` — schemas `STAGING`, `XREF_SNAPSHOT`, `TRANSFORMATION`, `SEMANTIC` |
-| Source | `CLN.CLEAN`, the tables assigned to this build's declared lanes |
+| Source | `CLN.CLEAN_BUILD`, the owner's frozen clone of `CLN.CLEAN`: the tables assigned to this build's declared lanes. Code never names `CLN.CLEAN` (`CLAUDE.md` D-43). |
 | Metadata | `DEV_G2M_AI.INFORMATION_SCHEMA`, `CLN.INFORMATION_SCHEMA`, `SNOWFLAKE.ACCOUNT_USAGE` where granted |
 
 **`CLN.XREF` is out of scope.** It is a schema, not a word — a `CLN.CLEAN`
 table whose name contains `XREF` is in scope like any other.
 
-**List `CLN.CLEAN` at M1, then assign each table to a declared lane or mark it
+**List `CLN.CLEAN_BUILD` at M1, then assign each table to a declared lane or mark it
 out of scope.** A previous build's grants may still be in place, so being able
 to see a table does not put it in scope. The owner confirms the assignment
 before any model is written. `table-usage.md` accounts for every table listed,
@@ -53,7 +53,7 @@ in scope or not.
 ```sql
 select table_schema, table_name, row_count, bytes, last_altered
 from CLN.INFORMATION_SCHEMA.TABLES
-where table_schema = 'CLEAN'
+where table_schema = 'CLEAN_BUILD'
 order by table_name;
 ```
 
@@ -142,9 +142,13 @@ Never:
   is manual and not the agent's job**
 - Write to any schema outside `DEV_G2M_AI`
 - Delete or overwrite a `docs/findings/` memo from an earlier milestone
-- **Archive the previous build.** Moving `docs/findings/`, `docs/sources.md`
-  and everything under `sql/` into `docs/completed-builds/` is the
-  owner's job, done between builds. **M1 confirms it has happened and stops if
+- Edit, redeploy, drop or call another build's lane objects, edit another
+  lane's seeder branch or semantic lane block, or change another lane's
+  classification rows (`CLAUDE.md` D-42)
+- **Archive the previous build.** Moving `docs/findings/`, `docs/sources.md`,
+  `scripts/run_build.sql` and the reconcile scripts into
+  `docs/completed-builds/` is the owner's job, done between builds. `sql/` is
+  not archived; it accumulates with `DEV_G2M_AI`. **M1 confirms it has happened and stops if
   it has not** (`CLAUDE.md` §2).
 
 ---

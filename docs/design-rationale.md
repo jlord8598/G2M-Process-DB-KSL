@@ -88,8 +88,8 @@ the build rather than the last few minutes.
 
 An earlier version had people correcting classifications in the build
 environment, and the insert-only merge existed to protect those edits. That
-model is gone: the build environment is cleared between builds, so anything
-entered there would be lost.
+model is gone: the promoted environment reads the master, so a correction
+made in the build environment would never reach anything that matters.
 
 Human correction now happens in the master table, after promotion, where it
 accumulates across every company. The pipeline produces best guesses; people
@@ -295,12 +295,18 @@ Nothing catches exceptions because nothing has a child to report on. An
 uncaught error leaves the MAIN with its origin intact, and whatever called it
 stops.
 
-## Why the environment is cleared between builds
+## Why the environment accumulates
+
+An earlier version cleared `DEV_G2M_AI` between builds so a new build could not
+break a lane that already worked. It now keeps every company: each lane's
+staging and transformation objects are lane-named and disjoint, and the shared
+pieces (classification rows, seeder branches, semantic lane blocks) grow by one
+piece per lane.
 
 Every check groups by lane, so two lanes reconcile exactly as rigorously as
-fifteen. A clean environment adds nothing to prove and removes a real risk: a
-new build cannot break a lane that already works.
+fifteen. The risk clearing used to remove is now handled by a rule and a
+proof: a build changes only its own lanes (D-42), and check 5 hashes every
+earlier lane before and after the build, so a build that touched one fails.
 
-The promoted environment eventually holds one model unioning every path. That
-is possible precisely because the lanes are already identical in shape by the
-time anything reaches `SEMANTIC`.
+Semantic can union every company precisely because the lanes are already
+identical in shape by the time anything reaches `SEMANTIC`.
