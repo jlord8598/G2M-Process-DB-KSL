@@ -9,6 +9,11 @@ not evidence about this build's sources.**
 
 ---
 
+## Source schema
+
+`CLN.<SOURCE>`: *(fill at M1)*. Built from the frozen clone
+`CLN.<SOURCE>_BUILD`, cloned at *(created time, fill at M1)* (`CLAUDE.md` D-43).
+
 ## Lane declaration
 
 **Ask the owner. Do not infer lane names from source system names.**
