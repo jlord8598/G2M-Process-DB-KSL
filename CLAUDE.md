@@ -42,7 +42,7 @@ it reconciles.
 
 ## 2. What a build is
 
-**One build covers one or two companies.** It runs in `DEV_G2M_AI`, is verified
+**One build covers one to three companies.** It runs in `DEV_G2M_AI`, is verified
 against all six checks, and is then promoted out manually. **`DEV_G2M_AI`
 accumulates:** each build adds its lanes' objects alongside every earlier
 build's, and nothing is cleared.
@@ -1279,7 +1279,12 @@ import, no credentials in anything under `scripts/`. A utility that needs data
 takes it as an **argument**.
 
 **Nothing runs outside the session's own connection.** No second tool, no
-ad-hoc client, no shelling out to a different profile.
+ad-hoc client, no shelling out to a different profile. **One exception:**
+`snow sql -f <file> --enable-templating NONE` may deploy and run files, so what
+runs is exactly the file text, but only after the agent has shown, before the
+build's first DDL, that it reports the same `CURRENT_ROLE`, `CURRENT_USER`,
+account and warehouse as the session. Record that evidence in `M2.md`; if any
+of the four differs, stop.
 
 **The role is the boundary.** What the agent cannot reach under its grants, it
 reports rather than routing around.

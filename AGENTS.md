@@ -81,7 +81,9 @@ the script    takes that output as an argument and compares
 
 Do not shell out to another client, profile, or tool. If something is
 unreachable under this role, **report that it is unreachable** rather than
-routing around it.
+routing around it. The one exception is `snow sql -f`, under the conditions in
+`CLAUDE.md` section 11: same role, user, account and warehouse, shown before
+the first DDL and recorded in `M2.md`.
 
 `INFORMATION_SCHEMA` is privilege-filtered — an empty result is not an empty
 database.
