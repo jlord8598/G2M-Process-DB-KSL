@@ -122,7 +122,7 @@ costs a run.
 Run without asking:
 
 - `SELECT`, `SHOW`, `DESCRIBE`, anything against `INFORMATION_SCHEMA`
-- Profiling queries of any volume against `CLN.CLEAN`
+- Profiling queries of any volume against this build's source schema `CLN.<SOURCE>`
 - Reading and writing files under `sql/`, `scripts/`, `docs/`
 
 Ask first:
