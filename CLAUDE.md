@@ -105,6 +105,40 @@ revoked, so their MAINs cannot run and are never called. Adding a branch to
 the seeder and a block to each semantic model is the only change a build makes
 to code that serves other lanes.
 
+**A build may rebuild an existing lane (D-44).** The owner declares it at M1:
+which existing lanes are rebuilt, and why (a source table changed, replaced or
+was removed). A rebuilt lane keeps its name, so its classification rows and
+the master's rows for it, corrections included, still apply. For a rebuilt
+lane the build may:
+
+- replace the lane's staging models, its transformation procedure and its
+  three MAINs;
+- replace the lane's branch in the seeder and its lane block in each of the six
+  semantic models;
+- retire objects that only the rebuilt lanes used (drop the procedure and its
+  table in `DEV_G2M_AI` and remove its file from `sql/`). In a promoted
+  environment the owner drops them by hand, because promotion never deletes.
+
+It may not delete or update the lane's classification rows. The merge stays
+insert-only: existing keys keep their classification, and only keys new to
+this extract are proposed.
+
+**A rebuild must prove its keys did not move.** The key rule (D-05, D-06,
+D-07) is the same as before, so the five-part key of every source line comes
+out as it did. At M4, report for each rebuilt lane:
+
+- existing keys the new staging reproduces;
+- keys that are new in this extract, which must be explained by new data
+  (new accounts, sites, months), never by a changed derivation;
+- existing keys no longer produced (dead keys, kept, D-14).
+
+If an existing account comes out under a different key, stop: that is a
+derivation change, and it would orphan the master rows people have corrected.
+
+Every lane not being rebuilt is covered by the earlier-build baseline in
+check 5 as usual. The rebuilt lanes are excluded from that baseline and
+covered by the key report above.
+
 **The build's records are archived; its code is not.** Before a new build
 starts, move into `docs/completed-builds/<build-name>/`:
 
@@ -1320,7 +1354,7 @@ Approval at a stop covers every phase up to the next stop, DDL included.
 
 | Phase | Do | Milestone |
 |---|---|---|
-| **M1. Analysis** | **Confirm the repo is archived (§2) before anything else.** List every granted `CLN.CLEAN` table and propose how they group into lanes, without naming them. **Stop (stop 1): the owner names the lanes and confirms which tables are in scope.** Check each name against `docs/completed-builds/` and report; the owner confirms it is unused in the master (D-32). Profile the in-scope tables. Establish per lane: `RECORD_TYPE` derivation, `ACCOUNT_KEY` composition, the section or dictionary giving `H1`/`H2`, statistic unit vocabulary, category derivation, `SOURCE_LINE_KEY`, period derivation, **how the source marks its own subtotal and rollup rows, and how its accounts map onto the standard hierarchy**. Write `docs/sources.md`. No DDL. | Findings, the lane declaration, and `docs/findings/open-questions.md` |
+| **M1. Analysis** | **Confirm the repo is archived (§2) before anything else.** For a rebuild (D-44), list the lanes being rebuilt and read their archived build record in `docs/completed-builds/` first: it shows how the key was built, and the rebuild must build it the same way. List every granted `CLN.CLEAN` table and propose how they group into lanes, without naming them. **Stop (stop 1): the owner names the lanes and confirms which tables are in scope.** Check each name against `docs/completed-builds/` and report; the owner confirms it is unused in the master (D-32). Profile the in-scope tables. Establish per lane: `RECORD_TYPE` derivation, `ACCOUNT_KEY` composition, the section or dictionary giving `H1`/`H2`, statistic unit vocabulary, category derivation, `SOURCE_LINE_KEY`, period derivation, **how the source marks its own subtotal and rollup rows, and how its accounts map onto the standard hierarchy**. Write `docs/sources.md`. No DDL. | Findings, the lane declaration, and `docs/findings/open-questions.md` |
 | **M2. Skeleton** | Four schemas, created if not present. Per lane, the three per-source MAINs with zero model calls; `SPROC_SEM_AI_MAIN` with zero calls if it does not yet exist, otherwise left as it is until M6; `scripts/run_build.sql`. Confirm `.gitattributes`, `scripts/check_line_endings.py` and `scripts/parity_check.py` are present, and run the parity check's six-fault self-test. | `run_build.sql` runs it; line-ending check clean; checks 4 and 6 pass |
 | **M3. Staging** | One model per source subject — facts, pacing and dictionaries alike — dictionaries staged per lane even where several lanes share one. Lossless. | Checks 1, 3, 4, 5 pass; identity form stated per model; the output profile (§9, the blind spot) compared with `sources.md` |
 | **M4. Classification** | The seeder, the table, the three review views | Check 2(a)–(d), (f), (k), (l); checks 4 and 5 including the classification assertion; the review report |
@@ -1440,7 +1474,7 @@ and then it changes here, for every build after.
 | D-29 | `STAT_UNIT_FAMILY` | Where a lane carries a statistic value alongside a money amount on one row, staging derives a `STAT_UNIT_FAMILY` attribute from the statistic account. It is not `METRIC_UNIT` and does not change the key or the routing. Retyping such rows as `STATISTIC` is rejected: it routes rows carrying real P&L amounts out of the income statement. |
 | D-30 | `AGGREGATION_TYPE` seeding | From the source where the source states it; `UNRATIFIED` only where nothing is known. |
 | D-31 | The master table | `CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY` carries the full five-part key including `RECORD_TYPE` and `SOURCE_LANE`, matching the build's grain exactly. |
-| D-32 | Lanes | Declared per build by the owner at M1. Never hard-coded in these documents, never inferred from a source system's name. **A lane name must be unique across every build ever run**, because the master is keyed by lane and two builds sharing a name collide there irreversibly. M1 checks the proposed names against `docs/completed-builds/` and the `SOURCE_LANE` values in `DEV_G2M_AI`, and reports; the owner checks the master and confirms. |
+| D-32 | Lanes | Declared per build by the owner at M1. Never hard-coded in these documents, never inferred from a source system's name. **A lane name must be unique across every build ever run**, because the master is keyed by lane and two builds sharing a name collide there irreversibly. M1 checks the proposed names against `docs/completed-builds/` and the `SOURCE_LANE` values in `DEV_G2M_AI`, and reports; the owner checks the master and confirms. A rebuild re-declares an existing lane under its existing name (D-44); that is the only reuse of a name. |
 | D-33 | The one-way loop | Nobody edits the classification table in `DEV_G2M_AI`. `REVIEW_STATUS` is always `UNREVIEWED` there. Human correction happens in the master after promotion and never flows back. |
 | D-34 | Environment lifecycle | `DEV_G2M_AI` accumulates: nothing is cleared between builds, and `sql/` stays with it. Only a build's records are archived. Promotion is manual and the agent does not perform it. |
 | D-35 | Orchestration | One MAIN per lane in each of `STAGING`, `XREF_SNAPSHOT` and `TRANSFORMATION`; one shared `SPROC_SEM_AI_MAIN`. No MAIN calls another; each runs on its own, in sequence. Nothing catches exceptions. |
@@ -1450,8 +1484,9 @@ and then it changes here, for every build after.
 | D-39 | The seeder | One for the environment, `SPROC_XREF_ACCOUNT_CLASSIFICATION(P_RUN_ID, P_LANE)`, named for its table, one derivation branch per lane. A build adds its own lanes' branches and changes no other. |
 | D-40 | Line endings | LF everywhere, enforced by `.gitattributes` and checked by `scripts/check_line_endings.py` before parity. |
 | D-41 | Unresolved categories | Never blocking. Unanswered values route to `UNKNOWN`; a status column is an attribute, not a category signal. |
-| D-42 | Accumulation | A build creates and changes only its own lanes' objects. To shared code it only adds: a branch to the seeder and a lane block to each of the six semantic models. Earlier builds' MAINs are never called, and check 5 proves earlier lanes are unchanged. |
+| D-42 | Accumulation | A build creates and changes only its own lanes' objects. To shared code it only adds: a branch to the seeder and a lane block to each of the six semantic models. Earlier builds' MAINs are never called, and check 5 proves earlier lanes are unchanged. Except for lanes the owner declares rebuilt (D-44). |
 | D-43 | Held source | Each build declares one source schema `CLN.<SOURCE>` and reads it directly under a load freeze the owner arranges for the build. M1 records every in-scope table's `last_altered`; a change before any milestone's checks is a stop. |
+| D-44 | Rebuilding a lane | The owner may declare existing lanes rebuilt at M1. The build may replace those lanes' code, seeder branch and lane blocks, and retire objects only they used. Classification rows are never deleted. The key rule is unchanged, and M4 proves it: existing keys reproduced, new keys explained by new data, dead keys kept. Any existing account appearing under a different key is a stop. |
 
 ### Questions
 

@@ -146,7 +146,8 @@ Never:
 - Delete or overwrite a `docs/findings/` memo from an earlier milestone
 - Edit, redeploy, drop or call another build's lane objects, edit another
   lane's seeder branch or semantic lane block, or change another lane's
-  classification rows (`CLAUDE.md` D-42)
+  classification rows (`CLAUDE.md` D-42), except for lanes the owner has
+  declared rebuilt (D-44), and even then never their classification rows
 - **Archive the previous build.** Moving `docs/findings/`, `docs/sources.md`,
   `scripts/run_build.sql` and the reconcile scripts into
   `docs/completed-builds/` is the owner's job, done between builds. `sql/` is
