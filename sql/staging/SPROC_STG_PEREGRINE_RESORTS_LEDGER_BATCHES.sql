@@ -16,6 +16,10 @@ $$
 -- ASSET_NAME: the fact's SITE_NAME; where that is null, STG_PEREGRINE_RESORTS_SITES on an
 -- exact SITE_TAG match (unique there), named in ASSET_NAME_SOURCE (owner Q-13).
 -- STG_PEREGRINE_RESORTS_SITES is built first by the lane's MAIN.
+-- DEPARTMENT_NAME: STG_PEREGRINE_RESORTS_DEPARTMENTS.DEPARTMENT_GENERIC on an exact join of
+-- tenant, SITE_TAG and department code, unique there so the join cannot fan
+-- out; null where no row matches (owner Q-03 (b), Q-04). Build 05 (D-44).
+-- SCENARIO: the source names none; the table name without schema (D-45).
 -- ============================================================================
 declare
     v_rows integer;
@@ -42,18 +46,17 @@ begin
         from src
     )
     -- ------------------------------------------------------------------------
-    -- department name dictionary from the lane's COA, one row per department
-    -- code; a name only where the code carries exactly one distinct
-    -- DEPARTMENT_NAME, otherwise null (owner Q-02, build 04)
+    -- department name dictionary: STG_PEREGRINE_RESORTS_DEPARTMENTS, unique on
+    -- (TENANT, SITE_TAG, DEPT_CODE); DEPARTMENT_GENERIC only, DEPARTMENT_OUTLET
+    -- not used (owner Q-03 (b), build 05)
     -- ------------------------------------------------------------------------
     , dept as (
         select
-              nullif(trim(coa.acct_dept_segment), '')                       as dept_code
-            , iff(count(distinct nullif(trim(coa.department_name), '')) = 1
-                , min(nullif(trim(coa.department_name), ''))
-                , null)                                                     as department_name
-        from CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_COA coa
-        group by 1
+              d.tenant
+            , d.site_tag
+            , d.dept_code
+            , d.department_generic                                          as department_name
+        from DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_DEPARTMENTS d
     )
     select
           :P_RUN_ID::varchar                                                    as run_id
@@ -87,7 +90,7 @@ begin
         , nullif(left(split_part(cln.c_stat, '-', 2), 2), '')::varchar          as stat_unit_family
         , cln.item_description::varchar                                         as account_desc
         , last_day(cln.fiscal_period_date)::date                                as period_end
-        , null::varchar                                                         as scenario
+        , 'CUR_PROFITSWORD_PEREGRINE_LEDGER_BATCHES'::varchar                 as scenario
         , cln.amt::float                                                        as source_amount
         , cln.qty::float                                                        as stat_value
         , false::boolean                                                        as is_subtotal
@@ -125,7 +128,9 @@ begin
     left join DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_SITES sites
         on  sites.site_tag = cln.site_tag
     left join dept
-        on  dept.dept_code = split_part(cln.c_acct, '-', 1)
+        on  dept.tenant    = 'PEREGRINE'
+        and dept.site_tag  = cln.site_tag
+        and dept.dept_code = split_part(cln.c_acct, '-', 1)
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_LEDGER_BATCHES);

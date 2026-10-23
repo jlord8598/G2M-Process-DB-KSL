@@ -113,6 +113,9 @@ begin
                        and ds.scenario_name in ('Budget', 'Budget 2')
                       then 'BUDGET'
                   when fact.source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_MONTHLY_EXTENDED'
+                       and ds.scenario_name in ( 'Budget 3' )
+                      then 'BUDGET'
+                  when fact.source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_MONTHLY_EXTENDED'
                        and ds.scenario_name in ('Primary Forecast', 'Forecast 2', 'Forecast 3')
                       then 'FORECAST'
                   when fact.source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_MONTHLY_EXTENDED'

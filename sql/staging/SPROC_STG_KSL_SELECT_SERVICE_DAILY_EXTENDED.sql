@@ -11,11 +11,13 @@ $$
 -- Identity form: long. count(source) = count(staged).
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried
 -- verbatim; standard columns derived alongside (docs/sources.md).
--- DEPARTMENT_NAME from the lane's COA, one row per department code, so the
--- left join cannot fan out (owner Q-02). Build 04 rebuild (D-44).
+-- DEPARTMENT_NAME: STG_KSL_SELECT_SERVICE_DEPARTMENTS.DEPARTMENT_GENERIC on an exact join of
+-- tenant, SITE_TAG and department code, unique there so the join cannot fan
+-- out; null where no row matches (owner Q-03 (b), Q-04). Build 05 (D-44).
 -- ASSET_NAME: the fact's SITE_NAME; where that is null, STG_KSL_SELECT_SERVICE_SITES on an
 -- exact SITE_TAG match (unique there), named in ASSET_NAME_SOURCE (owner Q-13).
 -- STG_KSL_SELECT_SERVICE_SITES is built first by the lane's MAIN.
+-- SCENARIO: the source names none; the table name without schema (D-45).
 -- ============================================================================
 declare
     v_rows integer;
@@ -42,18 +44,17 @@ begin
         from src
     )
     -- ------------------------------------------------------------------------
-    -- department name dictionary from the lane's COA, one row per department
-    -- code; a name only where the code carries exactly one distinct
-    -- DEPARTMENT_NAME, otherwise null (owner Q-02, build 04)
+    -- department name dictionary: STG_KSL_SELECT_SERVICE_DEPARTMENTS, unique on
+    -- (TENANT, SITE_TAG, DEPT_CODE); DEPARTMENT_GENERIC only, DEPARTMENT_OUTLET
+    -- not used (owner Q-03 (b), build 05)
     -- ------------------------------------------------------------------------
     , dept as (
         select
-              nullif(trim(coa.acct_dept_segment), '')                       as dept_code
-            , iff(count(distinct nullif(trim(coa.department_name), '')) = 1
-                , min(nullif(trim(coa.department_name), ''))
-                , null)                                                     as department_name
-        from CLN.CLEAN.CUR_PROFITSWORD_KSL_COA coa
-        group by 1
+              d.tenant
+            , d.site_tag
+            , d.dept_code
+            , d.department_generic                                          as department_name
+        from DEV_G2M_AI.STAGING.STG_KSL_SELECT_SERVICE_DEPARTMENTS d
     )
     -- ------------------------------------------------------------------------
     -- COA total flag, one row per tag: the tag is a COA total line, and whether
@@ -101,7 +102,7 @@ begin
         , nullif(left(split_part(cln.c_stat, '-', 2), 2), '')::varchar          as stat_unit_family
         , cln.description::varchar                                              as account_desc
         , cln.business_date::date                                               as period_end
-        , null::varchar                                                         as scenario
+        , 'CUR_PROFITSWORD_KSL_DAILY_EXTENDED'::varchar                       as scenario
         , cln.amt::float                                                        as source_amount
         , cln.stat::float                                                       as stat_value
         , (coalesce(cln.c_item like 'TOT%', false)
@@ -143,7 +144,9 @@ begin
     left join DEV_G2M_AI.STAGING.STG_KSL_SELECT_SERVICE_SITES sites
         on  sites.site_tag = cln.site_tag
     left join dept
-        on  dept.dept_code = split_part(cln.c_acct, '-', 1)
+        on  dept.tenant    = 'KSL'
+        and dept.site_tag  = cln.site_tag
+        and dept.dept_code = split_part(cln.c_acct, '-', 1)
     left join tot
         on  tot.tag = cln.c_item
     where 1=1;
