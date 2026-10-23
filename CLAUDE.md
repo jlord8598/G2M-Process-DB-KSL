@@ -483,7 +483,7 @@ STAT_UNIT_FAMILY         VARCHAR       -- where the lane carries one (D-29)
 ACCOUNT_DESC             VARCHAR
 PERIOD_END               DATE
 CATEGORY                 VARCHAR       -- ACTUAL | BUDGET | FORECAST
-SCENARIO                 VARCHAR       -- verbatim, never flattened
+SCENARIO                 VARCHAR       -- verbatim, never flattened, never null (D-45)
 H1, H2, H3, H4, H5       VARCHAR
 P_L_SECTION              VARCHAR       -- fixed function of H2
 NORMAL_BALANCE           VARCHAR       -- Debit | Credit | Mixed | null
@@ -972,6 +972,15 @@ route on it.
 **Never flatten a scenario into its category and never merge two named
 scenarios.** A lane may carry several budgets or several forecasts. Category
 chooses the table; scenario is carried so a consumer can filter to one.
+
+**Every fact row has a SCENARIO (D-45).** Where the source names a scenario,
+SCENARIO carries that name verbatim. Where it names none, and the category
+comes from the source table or from an unpivoted measure column, SCENARIO
+carries that table's name (without schema, e.g. `CUR_PROFITSWORD_KSL_DAILY_EXTENDED`)
+or that column's name, verbatim. This is not a label invented for the row:
+it is the source's own name for where the row came from. Record which rule
+applies per model in `docs/sources.md`. A lane gets this at its next build
+or rebuild; until then its SCENARIO may be null where the source names none.
 
 ---
 
@@ -1487,6 +1496,7 @@ and then it changes here, for every build after.
 | D-42 | Accumulation | A build creates and changes only its own lanes' objects. To shared code it only adds: a branch to the seeder and a lane block to each of the six semantic models. Earlier builds' MAINs are never called, and check 5 proves earlier lanes are unchanged. Except for lanes the owner declares rebuilt (D-44). |
 | D-43 | Held source | Each build declares one source schema `CLN.<SOURCE>` and reads it directly under a load freeze the owner arranges for the build. M1 records every in-scope table's `last_altered`; a change before any milestone's checks is a stop. |
 | D-44 | Rebuilding a lane | The owner may declare existing lanes rebuilt at M1. The build may replace those lanes' code, seeder branch and lane blocks, and retire objects only they used. Classification rows are never deleted. The key rule is unchanged, and M4 proves it: existing keys reproduced, new keys explained by new data, dead keys kept. Any existing account appearing under a different key is a stop. |
+| D-45 | Scenario never null | Where the source names a scenario, SCENARIO is that name verbatim. Where it names none and the category comes from the source table or an unpivoted measure column, SCENARIO is that table name (no schema) or column name, verbatim. Applied to each lane at its next build or rebuild. |
 
 ### Questions
 

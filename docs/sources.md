@@ -63,7 +63,7 @@ identifier. **Pacing and dictionary staging tables keep their own shape**, plus
 | `ASSET_NAME` | The site or property name, where a dimension supplies one. |
 | `DEPARTMENT_NAME` | Where the lane supplies one; null otherwise. |
 | `PERIOD_END` | A date, derived per lane. |
-| `SCENARIO` | The named scenario, verbatim. |
+| `SCENARIO` | The named scenario, verbatim; where the source names none, the stating table or measure column name (D-45). Never null. |
 | `SOURCE_AMOUNT` | As booked, **sign included**. Never strip a negative - that is a silent repair (invariant 3). |
 | `STAT_VALUE` | Where the lane holds a statistic measure. |
 | `IS_SUBTOTAL` | The source's own total or rollup row. Default `FALSE`. |
