@@ -16,7 +16,8 @@ $$
 -- segment 2 only on a 6-segment ACCOUNT (structural; the 156 one-segment
 -- x... strings and the ADR/Rooms lines get null). No department names.
 -- ACCOUNT_KEY = ACCOUNT, else LINE_CLASS (SOURCE_ITEM_ID) on ADR/Rooms (Q-05).
--- RECORD_TYPE from LINE_CLASS: ADR, Rooms STATISTIC; Item AMOUNT (Q-06). The
+-- RECORD_TYPE: LINE_CLASS ADR, Rooms STATISTIC (Q-06); natural account 9000-9990
+-- STATISTIC, 9990 being stat-ledger offsets (owner Q-07); else AMOUNT. The
 -- branch amount is SOURCE_AMOUNT on AMOUNT rows and STAT_VALUE on STATISTIC.
 -- SCENARIO = the branch's measure column name (D-45). No subtotal signal.
 -- ACCOUNT_DESC from STG_DAVIDSON_ACCOUNTS, MIN per entity + string + source
@@ -46,7 +47,7 @@ begin
     -- ------------------------------------------------------------------------
     -- cleaned key inputs
     -- ------------------------------------------------------------------------
-    , cln as (
+    , cln0 as (
         select
               unp.*
             , nullif(trim(unp.hotel_code), '')                                   as c_site
@@ -55,8 +56,19 @@ begin
             , nullif(trim(unp.line_class), '')                                   as c_item
             , iff(regexp_count(unp.account, '-') = 5, nullif(split_part(unp.account, '-', 1), ''), null) as c_dept
             , iff(regexp_count(unp.account, '-') = 5, nullif(split_part(unp.account, '-', 2), ''), null) as c_natural
-            , upper(trim(unp.line_class)) in ('ADR', 'ROOMS')                    as c_is_stat
+            , upper(trim(unp.line_class)) in ('ADR', 'ROOMS')                    as c_is_class_stat
         from unp
+    )
+    -- ------------------------------------------------------------------------
+    -- statistic rule: LINE_CLASS ADR/Rooms, or natural account 9000-9990
+    -- (owner Q-07, from data; source owner to confirm)
+    -- ------------------------------------------------------------------------
+    , cln as (
+        select
+              cln0.*
+            , (cln0.c_is_class_stat
+                or coalesce(left(cln0.c_natural, 1) = '9', false))               as c_is_stat
+        from cln0
     )
     -- ------------------------------------------------------------------------
     -- account description dictionary, one value per string (M1)
@@ -88,8 +100,12 @@ begin
               else 'AMOUNT'
           end::varchar                                                          as record_type
         , case
-              when cln.c_is_stat
+              when cln.c_is_class_stat
                   then 'LINE_CLASS ' || cln.line_class || ': STATISTIC (stated by the source class; Q-06)'
+              when cln.c_natural = '9990'
+                  then 'natural account 9990 (LAOFF/STOFF): stat-ledger offset, STATISTIC, adds to no total (owner Q-07, from data; source owner to confirm)'
+              when cln.c_is_stat
+                  then 'natural account ' || cln.c_natural || ' (9000-9990): STATISTIC (owner Q-07, from data; source owner to confirm)'
               else 'LINE_CLASS ' || coalesce(cln.line_class, '~BLANK~') || ': AMOUNT (Q-06)'
           end::varchar                                                          as record_type_source
         , null::varchar                                                         as stat_unit_family

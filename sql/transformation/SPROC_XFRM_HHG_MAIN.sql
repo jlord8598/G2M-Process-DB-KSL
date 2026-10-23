@@ -9,16 +9,17 @@ $$
 -- Transformation orchestrator for lane HHG. Builds nothing
 -- itself. Stamps its own RUN_ID and passes it to SPROC_XFRM_HHG.
 -- Calls no other MAIN. Catches no exception.
--- Build 06 M2 skeleton: no model call yet.
 -- ============================================================================
 declare
     v_run_id varchar default 'RUN_' || to_char(current_timestamp(), 'YYYYMMDD_HH24MISS_FF3');
     v_models integer default 0;
-    v_r      varchar default '';
+    v_r      varchar;
 begin
     -- ------------------------------------------------------------------------
-    -- model calls: none at M2
+    -- model calls
     -- ------------------------------------------------------------------------
+    call DEV_G2M_AI.TRANSFORMATION.SPROC_XFRM_HHG(:v_run_id) into :v_r;
+    v_models := v_models + 1;
 
     return 'SPROC_XFRM_HHG_MAIN ' || v_run_id || ' models=' || v_models || ' | ' || v_r;
 end;

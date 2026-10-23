@@ -23,6 +23,21 @@ carry over unchanged, except the changes declared for this build.
 | HHG MAIN order | **Approved:** dictionaries before facts. |
 | Q-07, Q-09 | **With the source owner. M4 is held:** no classification rows are written until the answer arrives, and the D-43 baseline is re-run before resuming. |
 
+## Answered before M4 (owner, 2026-10-23): decided by owner from data; source owner to confirm
+
+| # | Answer |
+|---|---|
+| Q-07 | **MR naturals 9000-9990 are STATISTICS.** 9000-9114 and 9400: room, cover and attendee counts. 9102 (`LHMGT`/`LHNMT`/`LHCON`): labor hours by position. 9300 (`UT*`, `ELECT`, `GAS`, `WATER`, `SEWER`): utility usage. 9990 `LAOFF`/`STOFF`: stat-ledger offsets, STATISTIC and adding to no total, with that reason stated. Built at M4; the segment values were checked against the data (M4). 9201 (`LHNMT`/`LNCOK`, 12 rows) falls in the range. |
+| Q-09 | **MR hierarchy by natural account, not the 5xxx digit.** 4xxx Revenue. 5000-5006 Payroll. 5100 COGS. 5110 the nearest existing cost-of-sales H2 (`Cost of Goods Sold`). 5200, 5201, 5900 Operating Expenses. 5202-5204 utilities: no `Utilities` H2 exists, so `Operating Expenses` now, listed at stop 4. 5990 Allocations & Reserves. 6xxx-8xxx as proposed. The PL mapping stays as proposed: worded sections only. Built at M4. |
+
+## Open at stop 4
+
+| # | Item | Blocks | Proposal |
+|---|---|---|---|
+| Q-11 | **`Utilities` H2.** It is not in the standard vocabulary (CLAUDE.md section 5) or in any `DEV_G2M_AI` lane. The master was not read (D-03). DAVIDSON MR 5202-5204: 99 keys, 1,188 source rows, now seeded `Operating Expenses`. | no | The owner checks the master, and adds `Utilities` there and to the standard vocabulary if wanted; the master rows are re-pointed after promotion. |
+| Q-12 | **Q-07 and Q-09 await the source owner's confirmation.** | no | If he disagrees, the DAVIDSON staging model (Q-07) or the seeder branch (Q-09) changes. DAVIDSON's classification rows are seeded, so a Q-09 change after promotion is a master correction, not a re-seed (D-14). |
+| Q-13 | **Report only.** DAVIDSON PL department sections stay `Unclassified`: 17,182 keys and 435,840 staged rows, the bulk of `SEM_AI_UNKNOWN` for the lane. | no | Classified in the master by people. |
+
 ## Resume steps (M4 on hold since 2026-10-23, end of day)
 
 M4 resumes only when the source owner has answered Q-07 and Q-09. Then, in
@@ -61,3 +76,17 @@ order:
 | Q-08 | **PL subtotals.** Flag (a) `IS_ROLLUP` (40,824 rows; source flag); (b) every `SUMMARY` amount line (5,616 rows; verified on one line pair, 204 of 204 exact); (c) **amount** line items whose first word is `Total` (case-insensitive; 47,172 non-roll-up rows; structure only; built at M3 to exclude the statistic `Total RevPar`, a rate). **Borderline, not flagged:** `ALL_DEPARTMENT` lines with no `Total` word that may still be totals, for example lines beginning `NET` or `GROSS`; and on `SUMMARY`, the computed lines `Departmental Profit`, `Gross Operating Profit`, `House Profit`, `EBITDA`, `EBITDA LESS REPLACEMENT RESERVE` are flagged by (b) but are computed measures rather than totals. MR has no way to tell: unflagged. | M4 | (a)+(b)+(c) as stated; the owner to rule on the borderline groups. |
 | Q-09 | **Hierarchy.** MR: the leading digit of the natural account (segment 2) on the standard table. Digit 5 (89,844 rows, 227.5M actual) seeds `Cost of Goods Sold`, but with no descriptions it may hold departmental payroll; one-segment `x...` strings are `Unclassified`. PL: no code, so `Unclassified`, except sections that state their section in words: `Operating Revenues` gives Revenue; `Departmental Expenses` and `Undistributed Operating Expenses` give Expense / `Operating Expenses`; `Non-Operating Income and Expenses` and `NON-OPERATING INCOME & EXPENSE` give Below the Line; `MISCELLANEOUS INCOME` gives Revenue. Department sections (`ROOMS`, `SPA` ...) mix revenue and expense, so they are not mapped. | M4 | As stated. |
 | Q-10 | **Report only.** (a) MR and PL cover the same 15 hotels and 12 months, so summing both counts money twice; `SOURCE_TABLE` separates them. (b) `ACCOUNTS` is not unique on entity + string + source table: 2,043 extra rows differing only in `DEPARTMENT_DESCRIPTION` and `FIRST_SEEN_DATE`. It is staged losslessly; the facts read only `ACCOUNT_DESCRIPTION`, which has one value per string. (c) 12,684 PL rows repeat a line's dimensions; they are distinct source rows and are kept. | no | Recorded. |
+
+## Answered at stop 4 (owner, 2026-10-23)
+
+| # | Answer |
+|---|---|
+| Q-11 | **Closed.** `Utilities` (MR 5202-5204) stays under `Operating Expenses`. No new H2. |
+| 9201 | **Approved** as STATISTIC (labor hours, `LHNMT`/`LNCOK`). |
+| Stop 4 | **Build approved.** Promotion is done by the owner. |
+
+## For the business (master H2)
+
+| Item | Detail |
+|---|---|
+| DAVIDSON PL department sections | **17,182 keys are left `Unclassified` by design** (Q-09, Q-13). They are the `FULL_YEAR_PL` `ALL_DEPARTMENT` sections (`ROOMS`, `SPA`, `RESTAURANT 1` ...), whose lines mix revenue and expense: 435,840 staged rows, 164,040 of them subtotals. They land in `SEM_AI_UNKNOWN` (`UNCLASSIFIED_ACCOUNT`) until H1/H2 are assigned in the master. |

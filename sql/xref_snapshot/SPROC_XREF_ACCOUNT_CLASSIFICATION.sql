@@ -21,7 +21,8 @@ $$
 --              P_L_SECTION, NORMAL_BALANCE from H2; VALUE_SIGN from
 --              NORMAL_BALANCE.
 --   3 merge    insert-only; an existing key gets LAST_SEEN_RUN_ID only (D-14)
--- One derivation branch per lane. No exception is caught; an undeclared lane
+-- One derivation branch per lane (DAVIDSON added in build 06). No exception
+-- is caught; an undeclared lane
 -- raises.
 -- ============================================================================
 declare
@@ -1105,6 +1106,200 @@ begin
                           when c_section = 'Other Expenses' and m_btl = 1
                               then 'PL_SECTION Other Expenses with Non-Operating PL_LINE or NOI group: Below the Line (owner Q-06)'
                           else 'PL_SECTION ' || c_section || ' (stated; owner Q-06)'
+                      end as seed_source
+                from prop
+            )
+            select
+                  k_lane, k_site, k_dept, k_acct, k_rtype
+                , asset_name, department_name, account_number, stat_account, account_desc
+                , h1, h2
+                , 'UNCLASSIFIED' as h3
+                , 'UNCLASSIFIED' as h4
+                , 'UNCLASSIFIED' as h5
+                , case h2
+                      when 'Revenue'                  then 'Gross Profit'
+                      when 'Cost of Goods Sold'       then 'Gross Profit'
+                      when 'Payroll'                  then 'Operating'
+                      when 'Operating Expenses'       then 'Operating'
+                      when 'Other Income / (Expense)' then 'Non-Operating'
+                  end as p_l_section
+                , case h2
+                      when 'Revenue'                  then 'Credit'
+                      when 'Cost of Goods Sold'       then 'Debit'
+                      when 'Payroll'                  then 'Debit'
+                      when 'Operating Expenses'       then 'Debit'
+                      when 'Other Income / (Expense)' then 'Mixed'
+                  end as normal_balance
+                , case h2
+                      when 'Revenue'                  then 1
+                      when 'Cost of Goods Sold'       then -1
+                      when 'Payroll'                  then -1
+                      when 'Operating Expenses'       then -1
+                  end::number(2,0) as value_sign
+                , null::varchar as metric_unit
+                , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
+                , seed_source
+            from cls
+        ) src
+            on  tgt.source_lane      = src.k_lane
+            and tgt.source_site_code = src.k_site
+            and tgt.department       = src.k_dept
+            and tgt.account_key      = src.k_acct
+            and tgt.record_type      = src.k_rtype
+        when matched then update set
+              tgt.last_seen_run_id = :P_RUN_ID
+        when not matched then insert (
+              source_lane, source_site_code, department, account_key, record_type
+            , asset_name, department_name, account_number, stat_account, account_desc
+            , h1, h2, h3, h4, h5, p_l_section, normal_balance, value_sign
+            , metric_unit, aggregation_type, review_status, seed_source
+            , first_seen_run_id, last_seen_run_id
+        ) values (
+              src.k_lane, src.k_site, src.k_dept, src.k_acct, src.k_rtype
+            , src.asset_name, src.department_name, src.account_number, src.stat_account, src.account_desc
+            , src.h1, src.h2, src.h3, src.h4, src.h5, src.p_l_section, src.normal_balance, src.value_sign
+            , src.metric_unit, src.aggregation_type, 'UNREVIEWED', src.seed_source
+            , :P_RUN_ID, :P_RUN_ID
+        );
+
+    elseif (:P_LANE = 'DAVIDSON') then
+        -- ====================================================================
+        -- LANE DAVIDSON (build 06)
+        -- Facts: HOTEL_MONTHLY_REPORT (MR), FULL_YEAR_PL (PL).
+        -- STATISTIC: H1 Statistic first. H2 is the source's own code: the MR
+        --   natural account (9000-9990, owner Q-07), else the MR LINE_CLASS
+        --   (ADR, Rooms) or the PL line text (D-38). 9990 is a stat-ledger
+        --   offset and adds to no total (SEED_SOURCE says so).
+        -- MR money: by natural account (segment 2 of a 6-segment ACCOUNT, staged
+        --   as NATURAL_ACCOUNT), owner Q-09 (from data; source owner to
+        --   confirm): 4xxx Revenue; 5000-5006 Payroll; 5100, 5110 Cost of Goods
+        --   Sold; 5200-5204, 5900 Operating Expenses; 5990 Allocations &
+        --   Reserves; 6xxx Payroll, 7xxx Operating Expenses, 8xxx Other Income
+        --   / (Expense) (the section digit). Any other natural, and the
+        --   one-segment x... strings, Unclassified.
+        -- PL: no code. Worded sections only (owner Q-09): Operating Revenues and
+        --   MISCELLANEOUS INCOME Revenue; Departmental Expenses and
+        --   Undistributed Operating Expenses Operating Expenses; the two
+        --   Non-Operating sections Other Income / (Expense). Department
+        --   sections Unclassified.
+        -- H2 values are from the standard hierarchy only; none is invented.
+        -- ====================================================================
+        merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
+        using (
+            with
+            -- ----------------------------------------------------------------
+            -- fact staging rows
+            -- ----------------------------------------------------------------
+            fact as (
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , source_table, natural_account
+                from DEV_G2M_AI.STAGING.STG_DAVIDSON_HOTEL_MONTHLY_REPORT
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , source_table, null::varchar as natural_account
+                from DEV_G2M_AI.STAGING.STG_DAVIDSON_FULL_YEAR_PL
+            )
+            -- ----------------------------------------------------------------
+            -- extract: one row per five-part key, attributes by MIN()
+            -- ----------------------------------------------------------------
+            , ext as (
+                select
+                      coalesce(nullif(trim(source_lane), ''), '~BLANK~')      as k_lane
+                    , coalesce(nullif(trim(source_site_code), ''), '~BLANK~') as k_site
+                    , coalesce(nullif(trim(department), ''), '~BLANK~')       as k_dept
+                    , coalesce(nullif(trim(account_key), ''), '~BLANK~')      as k_acct
+                    , coalesce(nullif(trim(record_type), ''), '~BLANK~')      as k_rtype
+                    , min(asset_name)                                         as asset_name
+                    , min(department_name)                                    as department_name
+                    , min(account_number)                                     as account_number
+                    , min(stat_account)                                       as stat_account
+                    , min(account_desc)                                       as account_desc
+                    , min(source_table)                                       as src_tbl
+                    , min(natural_account)                                    as nat
+                from fact
+                where 1=1
+                group by 1, 2, 3, 4, 5
+            )
+            , prop as (
+                select
+                      ext.*
+                    , try_to_number(ext.nat) as n
+                from ext
+            )
+            -- ----------------------------------------------------------------
+            -- propose H1 / H2
+            -- ----------------------------------------------------------------
+            , cls as (
+                select
+                      prop.*
+                    , case
+                          when k_rtype = 'STATISTIC'                 then 'Statistic'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' then
+                              case
+                                  when n between 4000 and 4999       then 'Revenue'
+                                  when n between 5000 and 5006       then 'Expense'
+                                  when n in (5100, 5110)             then 'Expense'
+                                  when n between 5200 and 5204       then 'Expense'
+                                  when n = 5900                      then 'Expense'
+                                  when n = 5990                      then 'Allocations & Reserves'
+                                  when n between 6000 and 7999       then 'Expense'
+                                  when n between 8000 and 8999       then 'Below the Line'
+                                  else 'Unclassified'
+                              end
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL' then
+                              case
+                                  when k_dept in ('Operating Revenues', 'MISCELLANEOUS INCOME')                            then 'Revenue'
+                                  when k_dept in ('Departmental Expenses', 'Undistributed Operating Expenses')              then 'Expense'
+                                  when k_dept in ('Non-Operating Income and Expenses', 'NON-OPERATING INCOME & EXPENSE')   then 'Below the Line'
+                                  else 'Unclassified'
+                              end
+                          else 'Unclassified'
+                      end as h1
+                    , case
+                          when k_rtype = 'STATISTIC'                 then coalesce(nat, k_acct)
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' then
+                              case
+                                  when n between 4000 and 4999       then 'Revenue'
+                                  when n between 5000 and 5006       then 'Payroll'
+                                  when n in (5100, 5110)             then 'Cost of Goods Sold'
+                                  when n between 5200 and 5204       then 'Operating Expenses'
+                                  when n = 5900                      then 'Operating Expenses'
+                                  when n between 6000 and 6999       then 'Payroll'
+                                  when n between 7000 and 7999       then 'Operating Expenses'
+                                  when n between 8000 and 8999       then 'Other Income / (Expense)'
+                                  else 'UNCLASSIFIED'
+                              end
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL' then
+                              case
+                                  when k_dept in ('Operating Revenues', 'MISCELLANEOUS INCOME')                            then 'Revenue'
+                                  when k_dept in ('Departmental Expenses', 'Undistributed Operating Expenses')              then 'Operating Expenses'
+                                  when k_dept in ('Non-Operating Income and Expenses', 'NON-OPERATING INCOME & EXPENSE')   then 'Other Income / (Expense)'
+                                  else 'UNCLASSIFIED'
+                              end
+                          else 'UNCLASSIFIED'
+                      end as h2
+                    , case
+                          when k_rtype = 'STATISTIC' and nat = '9990'
+                              then 'RECORD_TYPE STATISTIC; natural 9990 (LAOFF/STOFF) stat-ledger offset, adds to no total; H2 = the natural account (owner Q-07)'
+                          when k_rtype = 'STATISTIC' and nat is not null
+                              then 'RECORD_TYPE STATISTIC; H2 = the natural account, the source code (owner Q-07)'
+                          when k_rtype = 'STATISTIC'
+                              then 'RECORD_TYPE STATISTIC; H2 = the source line identifier (LINE_CLASS or PL line text; Q-06)'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' and n is null
+                              then 'no natural account (one-segment or blank ACCOUNT): nothing to derive, not repaired'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' and (n between 4000 and 5006 or n in (5100, 5110) or n between 5200 and 5204 or n in (5900, 5990))
+                              then 'natural account ' || nat || ' (owner Q-09 map, from data; source owner to confirm)'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' and n between 6000 and 8999
+                              then 'section digit ' || left(nat, 1) || ' of natural account ' || nat || ' (owner Q-09: as proposed)'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT'
+                              then 'natural account ' || nat || ': not in the owner map, nothing derived'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL' and h1 <> 'Unclassified'
+                              then 'PL SECTION ' || k_dept || ' as stated section (owner Q-09)'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL'
+                              then 'PL SECTION ' || k_dept || ': department section, mixes revenue and expense, not mapped (owner Q-09)'
+                          else 'source table not in the lane: nothing to derive'
                       end as seed_source
                 from prop
             )
