@@ -17,6 +17,8 @@ $$
 -- Site = COMPANY_ID; ASSET_NAME = COMPANY_NAME. Revenue books negative; as booked.
 -- SOURCE_LINE_KEY: the 7 dimension columns unique on the source (M1) plus the
 -- branch; the file path and row are null on a branch whose measure is empty.
+-- SCENARIO = the name of the branch's defining measure column, ACTUAL_AMOUNT or
+-- FORECAST_AMOUNT: the source names no scenario (D-45, build 06 Q-03).
 -- ============================================================================
 declare
     v_rows integer;
@@ -34,9 +36,9 @@ begin
     -- unpivot by category: one branch per measure pair, nulls kept
     -- ------------------------------------------------------------------------
     , unp as (
-        select src.*, 'ACTUAL'::varchar   as measure_column, src.actual_amount   as m_amount, src.actual_stat   as m_stat, src.actual_source_file_path   as m_path, src.actual_source_row_number   as m_row from src
+        select src.*, 'ACTUAL'::varchar   as measure_column, 'ACTUAL_AMOUNT'::varchar   as m_scenario, src.actual_amount   as m_amount, src.actual_stat   as m_stat, src.actual_source_file_path   as m_path, src.actual_source_row_number   as m_row from src
         union all
-        select src.*, 'FORECAST'::varchar as measure_column, src.forecast_amount as m_amount, src.forecast_stat as m_stat, src.forecast_source_file_path as m_path, src.forecast_source_row_number as m_row from src
+        select src.*, 'FORECAST'::varchar as measure_column, 'FORECAST_AMOUNT'::varchar as m_scenario, src.forecast_amount as m_amount, src.forecast_stat as m_stat, src.forecast_source_file_path as m_path, src.forecast_source_row_number as m_row from src
     )
     select
           :P_RUN_ID::varchar                                                    as run_id
@@ -55,7 +57,7 @@ begin
         , null::varchar                                                         as stat_unit_family
         , unp.account_description::varchar                                      as account_desc
         , unp.period_date::date                                                 as period_end
-        , null::varchar                                                         as scenario
+        , unp.m_scenario::varchar                                               as scenario
         , null::float as source_amount
         , unp.m_amount::float as stat_value
         , false::boolean                                                        as is_subtotal

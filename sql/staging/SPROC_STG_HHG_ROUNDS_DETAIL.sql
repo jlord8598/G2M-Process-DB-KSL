@@ -16,7 +16,8 @@ $$
 -- No account, stat account or line item: ACCOUNT_KEY '~BLANK~', one key per
 -- club. Site = CLUB_CODE as written; ASSET_NAME from CLUB_LIST on the exact
 -- code (all 50 clubs present, M1). The 3,650 zero rows dated after the load
--- are kept (owner Q-07).
+-- are kept (owner Q-07). The source names no scenario; category comes from the
+-- table, so SCENARIO = the table name without schema (D-45, build 06 Q-03).
 -- ============================================================================
 declare
     v_rows integer;
@@ -68,7 +69,7 @@ begin
         , null::varchar                                                         as stat_unit_family
         , null::varchar                                                         as account_desc
         , cln.round_date::date                                                  as period_end
-        , null::varchar                                                         as scenario
+        , 'CLN_HERITAGE_GOLF_ROUNDS_DETAIL'::varchar                            as scenario
         , null::float                                                           as source_amount
         , cln.rounds_count::float                                               as stat_value
         , false::boolean                                                        as is_subtotal

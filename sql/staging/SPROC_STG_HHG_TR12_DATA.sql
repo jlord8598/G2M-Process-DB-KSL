@@ -13,8 +13,9 @@ $$
 -- verbatim; standard columns derived alongside (docs/sources.md).
 -- SCENARIO is carried once: the standard column is the raw value verbatim.
 -- ACCOUNT_CODE = entity(4)-department(3)-natural account(5).
--- Site = the entity segment as written; no name matching, so ASSET_NAME is
--- null (owner Q-03).
+-- Site = the entity segment as written. ASSET_NAME = STG_HHG_REFERENCES.CLUB_NAME
+-- where the entity equals CLUB_NUMBER exactly, else null (build 06 Q-02; the
+-- 9 unmatched entities are a client item); ASSET_NAME_SOURCE names the source.
 -- Department 999 is STATISTIC (owner Q-01): its AMOUNT goes to STAT_VALUE
 -- and SOURCE_AMOUNT is null; on every other row AMOUNT is SOURCE_AMOUNT.
 -- ACCOUNT_DESC from the lane's ACCOUNTS dictionary, null on every TR12
@@ -54,12 +55,25 @@ begin
             , a.account_description
         from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ACCOUNTS a
     )
+    -- ------------------------------------------------------------------------
+    -- club name by GL entity, unique on CLUB_NUMBER (build 06 M1)
+    -- ------------------------------------------------------------------------
+    , refs as (
+        select
+              r.club_number
+            , r.club_name
+        from DEV_G2M_AI.STAGING.STG_HHG_REFERENCES r
+    )
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'HHG'::varchar                                                        as source_lane
         , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA'::varchar        as source_table
         , cln.c_site::varchar                                                   as source_site_code
-        , null::varchar                                                         as asset_name
+        , refs.club_name::varchar                                               as asset_name
+        , case
+              when refs.club_name is not null
+                  then 'STG_HHG_REFERENCES.CLUB_NAME on entity = CLUB_NUMBER (build 06 Q-02)'
+          end::varchar                                                          as asset_name_source
         , cln.c_dept::varchar                                                   as department
         , null::varchar                                                         as department_name
         , cln.account_code::varchar                                             as account_number
@@ -100,6 +114,8 @@ begin
     from cln
     left join acct
         on  acct.full_account_string = cln.account_code
+    left join refs
+        on  refs.club_number = cln.c_site
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_HHG_TR12_DATA);
