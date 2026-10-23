@@ -13,6 +13,9 @@ $$
 -- verbatim; standard columns derived alongside (docs/sources.md).
 -- SOURCE_ITEM_ID is null: the source has no ITEM_TAG column (Q-14).
 -- STATUS is carried as an attribute and decides nothing.
+-- ASSET_NAME: the fact's SITE_NAME; where that is null, STG_PEREGRINE_RESORTS_SITES on an
+-- exact SITE_TAG match (unique there), named in ASSET_NAME_SOURCE (owner Q-13).
+-- STG_PEREGRINE_RESORTS_SITES is built first by the lane's MAIN.
 -- ============================================================================
 declare
     v_rows integer;
@@ -39,22 +42,29 @@ begin
         from src
     )
     -- ------------------------------------------------------------------------
-    -- department name dictionary, one row per (tenant, department code)
+    -- department name dictionary from the lane's COA, one row per department
+    -- code; a name only where the code carries exactly one distinct
+    -- DEPARTMENT_NAME, otherwise null (owner Q-02, build 04)
     -- ------------------------------------------------------------------------
     , dept as (
         select
-              coa.tenant
-            , split_part(nullif(trim(coa.account_number), ''), '-', 1) as dept_code
-            , min(coa.department)                                     as department_name
-        from CLN.CLEAN.CUR_PROFITSWORD_CHART_OF_ACCOUNTS coa
-        group by 1, 2
+              nullif(trim(coa.acct_dept_segment), '')                       as dept_code
+            , iff(count(distinct nullif(trim(coa.department_name), '')) = 1
+                , min(nullif(trim(coa.department_name), ''))
+                , null)                                                     as department_name
+        from CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_COA coa
+        group by 1
     )
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'PEREGRINE_RESORTS'::varchar                                          as source_lane
         , 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_LEDGER_BATCHES'::varchar         as source_table
         , cln.c_site::varchar                                                   as source_site_code
-        , cln.site_name::varchar                                                as asset_name
+        , coalesce(cln.site_name, sites.site_name)::varchar                     as asset_name
+        , case
+              when cln.site_name is not null   then 'fact SITE_NAME'
+              when sites.site_name is not null then 'STG_PEREGRINE_RESORTS_SITES.SITE_NAME on SITE_TAG (owner Q-13)'
+          end::varchar                                                          as asset_name_source
         , split_part(cln.c_acct, '-', 1)::varchar                               as department
         , dept.department_name::varchar                                         as department_name
         , cln.gl_acct::varchar                                                  as account_number
@@ -69,9 +79,9 @@ begin
               when cln.c_acct is not null and cln.c_stat is not null
                   then 'GL_ACCT and STAT_ACCT present: AMOUNT, STAT_UNIT_FAMILY set (owner Q-01, D-29)'
               when cln.c_acct is not null
-                  then 'GL_ACCT present, STAT_ACCT blank: AMOUNT (chart ACCOUNT_KIND DOLLAR, M1)'
+                  then 'GL_ACCT present, STAT_ACCT blank: AMOUNT (build 01 rule; chart ACCOUNT_KIND DOLLAR at build 01 M1)'
               when cln.c_stat is not null
-                  then 'STAT_ACCT present, GL_ACCT blank: STATISTIC (chart ACCOUNT_KIND STAT, M1)'
+                  then 'STAT_ACCT present, GL_ACCT blank: STATISTIC (build 01 rule; chart ACCOUNT_KIND STAT at build 01 M1)'
               else 'GL_ACCT and STAT_ACCT blank: AMOUNT (assumption, Q-15)'
           end::varchar                                                          as record_type_source
         , nullif(left(split_part(cln.c_stat, '-', 2), 2), '')::varchar          as stat_unit_family
@@ -112,9 +122,10 @@ begin
         , cln.dw_updated_date
         , cln.cur_load_date
     from cln
+    left join DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_SITES sites
+        on  sites.site_tag = cln.site_tag
     left join dept
-        on  dept.tenant    = 'PEREGRINE'
-        and dept.dept_code = split_part(cln.c_acct, '-', 1)
+        on  dept.dept_code = split_part(cln.c_acct, '-', 1)
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_LEDGER_BATCHES);

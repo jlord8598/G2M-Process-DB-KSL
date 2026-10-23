@@ -9,6 +9,8 @@ $$
 -- Staging orchestrator for lane PEREGRINE_RESORTS. Builds nothing itself.
 -- Stamps its own RUN_ID and passes it to every model it calls.
 -- Calls no other MAIN. Catches no exception.
+-- Build 04 rebuild (D-44): the shared chart call is retired (owner Q-06) and
+-- the lane's own COA dictionary is staged (owner Q-01).
 -- ============================================================================
 declare
     v_run_id varchar default 'RUN_' || to_char(current_timestamp(), 'YYYYMMDD_HH24MISS_FF3');
@@ -17,9 +19,29 @@ declare
     v_log    varchar default '';
 begin
     -- ------------------------------------------------------------------------
-    -- model calls: shared dictionary
+    -- model calls: lane dictionaries (first: the fact models read STG_PEREGRINE_RESORTS_SITES, owner Q-13)
     -- ------------------------------------------------------------------------
-    call DEV_G2M_AI.STAGING.SPROC_STG_SHARED_CHART_OF_ACCOUNTS(:v_run_id) into :v_r;
+    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_SALES_BOOKINGS(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_DATASETS(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_SITES(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_SITE_GROUPS(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_ACCOUNT_CLASS(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_COA(:v_run_id) into :v_r;
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 
@@ -54,29 +76,6 @@ begin
     v_models := v_models + 1;
 
     call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_SALES_PACE_EVENTS(:v_run_id) into :v_r;
-    v_log := v_log || '; ' || v_r;
-    v_models := v_models + 1;
-
-    -- ------------------------------------------------------------------------
-    -- model calls: lane dictionaries
-    -- ------------------------------------------------------------------------
-    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_SALES_BOOKINGS(:v_run_id) into :v_r;
-    v_log := v_log || '; ' || v_r;
-    v_models := v_models + 1;
-
-    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_DATASETS(:v_run_id) into :v_r;
-    v_log := v_log || '; ' || v_r;
-    v_models := v_models + 1;
-
-    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_SITES(:v_run_id) into :v_r;
-    v_log := v_log || '; ' || v_r;
-    v_models := v_models + 1;
-
-    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_SITE_GROUPS(:v_run_id) into :v_r;
-    v_log := v_log || '; ' || v_r;
-    v_models := v_models + 1;
-
-    call DEV_G2M_AI.STAGING.SPROC_STG_PEREGRINE_RESORTS_ACCOUNT_CLASS(:v_run_id) into :v_r;
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 

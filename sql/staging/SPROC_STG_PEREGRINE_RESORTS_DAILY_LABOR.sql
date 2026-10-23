@@ -14,6 +14,11 @@ $$
 -- SOURCE_ITEM_ID = LABEL, DEPARTMENT = numeric prefix of DEPARTMENT_LABEL,
 -- SOURCE_LINE_KEY null. PERSON_ID, EMPLOYEE_ID and EMPLOYEE_NAME are staged
 -- here only and never reach SEMANTIC (owner Q-06).
+-- DEPARTMENT_NAME from the lane's COA, one row per department code (owner
+-- Q-02). Build 04 rebuild (D-44).
+-- ASSET_NAME: the fact's SITE_NAME; where that is null, STG_PEREGRINE_RESORTS_SITES on an
+-- exact SITE_TAG match (unique there), named in ASSET_NAME_SOURCE (owner Q-13).
+-- STG_PEREGRINE_RESORTS_SITES is built first by the lane's MAIN.
 -- ============================================================================
 declare
     v_rows integer;
@@ -41,22 +46,29 @@ begin
         from src
     )
     -- ------------------------------------------------------------------------
-    -- department name dictionary, one row per (tenant, department code)
+    -- department name dictionary from the lane's COA, one row per department
+    -- code; a name only where the code carries exactly one distinct
+    -- DEPARTMENT_NAME, otherwise null (owner Q-02, build 04)
     -- ------------------------------------------------------------------------
     , dept as (
         select
-              coa.tenant
-            , split_part(nullif(trim(coa.account_number), ''), '-', 1) as dept_code
-            , min(coa.department)                                     as department_name
-        from CLN.CLEAN.CUR_PROFITSWORD_CHART_OF_ACCOUNTS coa
-        group by 1, 2
+              nullif(trim(coa.acct_dept_segment), '')                       as dept_code
+            , iff(count(distinct nullif(trim(coa.department_name), '')) = 1
+                , min(nullif(trim(coa.department_name), ''))
+                , null)                                                     as department_name
+        from CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_COA coa
+        group by 1
     )
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'PEREGRINE_RESORTS'::varchar                                          as source_lane
         , 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_DAILY_LABOR'::varchar            as source_table
         , cln.c_site::varchar                                                   as source_site_code
-        , cln.site_name::varchar                                                as asset_name
+        , coalesce(cln.site_name, sites.site_name)::varchar                     as asset_name
+        , case
+              when cln.site_name is not null   then 'fact SITE_NAME'
+              when sites.site_name is not null then 'STG_PEREGRINE_RESORTS_SITES.SITE_NAME on SITE_TAG (owner Q-13)'
+          end::varchar                                                          as asset_name_source
         , cln.c_dept::varchar                                                   as department
         , dept.department_name::varchar                                         as department_name
         , cln.c_acct::varchar                                                   as account_number
@@ -96,9 +108,10 @@ begin
         , cln.dw_updated_date
         , cln.cur_load_date
     from cln
+    left join DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_SITES sites
+        on  sites.site_tag = cln.site_tag
     left join dept
-        on  dept.tenant    = 'PEREGRINE'
-        and dept.dept_code = cln.c_dept
+        on  dept.dept_code = cln.c_dept
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_DAILY_LABOR);

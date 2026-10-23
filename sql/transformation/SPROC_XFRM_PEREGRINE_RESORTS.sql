@@ -119,6 +119,9 @@ begin
                        and ds.scenario_name in ( 'Flex', 'RMS - OneYield', 'RMS - HiltonGRO/IDeaS'
                                                , '5 Year Plan 2026 Final' )
                       then 'FORECAST'
+                  when fact.source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_MONTHLY_EXTENDED'
+                       and ds.scenario_name in ( 'Smart Forecast' )
+                      then 'FORECAST'
               end as category
             , case
                   when fact.source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_MONTHLY_EXTENDED'
