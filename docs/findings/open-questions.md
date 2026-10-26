@@ -24,3 +24,10 @@ DDL is approved through M6 for BEAUMIER and NEWBURY objects only.
 | Q-03 | BEAUMIER | **`ASSET_NAME` rule.** `LOCATION_MAP.HOTEL_NAME` on an exact `HOTEL_CODE` join: 13 of 13 codes match in BP, BUDGET and ACCOUNTS, so none is unmatched. (a) Do BMR and CPH take their map names (`Beaumier Corporate`, `Beaumier Corporate - Exceptional Charges`) or stay null? (b) Stage the map as `STG_BEAUMIER_LOCATION_MAP` (D-26) and call dictionaries before facts? (c) `CANCELLATIONS` (pacing) is unchanged? | M3 | (a) Map names, with `ASSET_NAME_SOURCE` naming the source and `ENTITY_TYPE` (`... (CORPORATE)`). (b) Yes. (c) Yes. |
 | Q-04 | NEWBURY | **D-45 for `TRIAL_BALANCE`.** ACTUAL and BUDGET branches name no scenario: `ACTUAL_AMOUNT` and `BUDGET_AMOUNT`. The FORECAST branch names `FORECAST_VERSION` on 2,873 rows (`Forecast9` 725, `Forecast10` 2,148) and nothing on 13,447 rows, exactly the rows whose forecast amount is null. | M3 | Keep the version verbatim where the source gives one; `FORECAST_AMOUNT` where it gives none. The branch then carries three values. |
 | Q-05 | process | **`docs/client-requests/2026-10-26/beaumier_hotels.csv`** contains U+FFFD replacement characters for two names (`Les Trois Vall?es`, `L?Alpaga`). The source map holds `Les Trois Vallées` and `L'Alpaga` correctly. | no | Commit as given, or regenerate from `CLN_BEAUMIER_LOCATION_MAP` (UTF-8) first. The owner to choose. |
+
+## Open at stop 4
+
+| # | Item | Blocks | Note |
+|---|---|---|---|
+| Q-06 | **Stream-level rebuild diff not available.** No hash of `XFRM_BEAUMIER_*` / `XFRM_NEWBURY_*` without `ASSET_NAME` / `SCENARIO` was taken before M3, which rebuilt them. The evidence that only those columns moved is the staging diff (M3), the unchanged transformation procedures (equal MD5, M5) and checks 1, 3 and 5. | no | Recorded. Future rebuilds: take stream and semantic rest hashes at M2, before the first staging run. |
+| - | **No owner question blocks approval.** No hotel code is unmatched; no H2 needs adding; 0 keys moved. | | |

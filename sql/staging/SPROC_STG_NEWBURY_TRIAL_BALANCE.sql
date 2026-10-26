@@ -21,8 +21,10 @@ $$
 -- the SUBACCOUNT text as stated.
 -- Site = BUSINESS_UNIT as written (owner Q-11). Descriptions from the lane's
 -- ACCOUNTS dictionary, unique on FULL_ACCOUNT_STRING and 1:1 with the keys.
--- SCENARIO = FORECAST_VERSION on the forecast branch; none is stated for
--- actual or budget. MEASURE_COLUMN names the branch; category is set at M5.
+-- SCENARIO (D-45, build 07 Q-04): FORECAST_VERSION verbatim on the forecast
+-- branch where the source gives one, else the measure column name
+-- (FORECAST_AMOUNT); ACTUAL_AMOUNT / BUDGET_AMOUNT on the other branches, which
+-- name no scenario. MEASURE_COLUMN names the branch; category is set at M5.
 -- ============================================================================
 declare
     v_rows integer;
@@ -40,11 +42,11 @@ begin
     -- unpivot: one branch per measure column, nulls kept
     -- ------------------------------------------------------------------------
     , unp as (
-        select src.*, 'ACTUAL_AMOUNT'::varchar   as measure_column, src.actual_amount   as measure_value, null::varchar            as measure_scenario from src
+        select src.*, 'ACTUAL_AMOUNT'::varchar   as measure_column, src.actual_amount   as measure_value, 'ACTUAL_AMOUNT'::varchar   as measure_scenario from src
         union all
-        select src.*, 'FORECAST_AMOUNT'::varchar as measure_column, src.forecast_amount as measure_value, src.forecast_version     as measure_scenario from src
+        select src.*, 'FORECAST_AMOUNT'::varchar as measure_column, src.forecast_amount as measure_value, coalesce(nullif(src.forecast_version, ''), 'FORECAST_AMOUNT')::varchar as measure_scenario from src
         union all
-        select src.*, 'BUDGET_AMOUNT'::varchar   as measure_column, src.budget_amount   as measure_value, null::varchar            as measure_scenario from src
+        select src.*, 'BUDGET_AMOUNT'::varchar   as measure_column, src.budget_amount   as measure_value, 'BUDGET_AMOUNT'::varchar   as measure_scenario from src
     )
     -- ------------------------------------------------------------------------
     -- cleaned key inputs

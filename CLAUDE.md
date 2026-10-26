@@ -135,6 +135,8 @@ out as it did. At M4, report for each rebuilt lane:
 If an existing account comes out under a different key, stop: that is a
 derivation change, and it would orphan the master rows people have corrected.
 
+Before the first redeploy, hash every downstream stream and semantic table both in full and excluding the columns this build changes, so M4 can show a column-level before/after diff.
+
 Every lane not being rebuilt is covered by the earlier-build baseline in
 check 5 as usual. The rebuilt lanes are excluded from that baseline and
 covered by the key report above.

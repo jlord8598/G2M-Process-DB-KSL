@@ -1,8 +1,9 @@
 # Sources - build 07 (rebuild of BEAUMIER and NEWBURY, D-44)
 
-**State: stop 1 of M1.** Written from queries run in this session against
-`CLN.BOX_INVESTMENT_DATA`. Statements are marked *measured*, *decided*
-(owner) or *proposed* (open in `findings/open-questions.md`).
+**State: stop 4 (M6 complete).** Written from queries run in this session
+against `CLN.BOX_INVESTMENT_DATA`. The stop-1 proposals Q-01 to Q-05 are
+*decided* (owner, `findings/open-questions.md`); the results are in
+`findings/M3.md` to `M6.md`.
 
 **Scope (owner).**
 - **BEAUMIER (rebuild, D-44):**
@@ -40,7 +41,7 @@
 - **Freeze:** the owner's start and end were not given (the request read
   `<start>` to `<end>`). The database clock at the first query was
   **2026-10-26 12:39:29.224 PDT** (query `01c7fe9b-010a-58cf-0003-4ff21bf4277a`).
-  This is proposed as the start (Q-02).
+  **Decided (Q-02): 2026-10-26 12:39:29 PDT to 2026-10-28 12:39 PDT.**
 - **Against earlier records (measured).** The 13 BEAUMIER and NEWBURY tables
   that builds 02 and 03 read carry the same `last_altered` (2026-10-19
   15:39-15:41) and row counts. `CLN_BEAUMIER_LOCATION_MAP` is new, loaded
@@ -68,7 +69,7 @@ every numeric column** (query `01c7fe9e-010a-58c4-0003-4ff21bf3e986`).
 
 ---
 
-## Tables and lanes (proposed, Q-01)
+## Tables and lanes (decided, Q-01)
 
 | Table | Lane | Role |
 |---|---|---|
@@ -107,7 +108,7 @@ Both lanes are rebuilt under their existing names (D-44). No new name.
 - **`CANCELLATIONS` (pacing).** It carries `HOTEL_NAME` and no code. Its 11
   names equal the map's 11 hotel names exactly (query
   `01c7fe9f-010a-58c5-0003-4ff21bf3bbba`).
-- **Proposed rule (Q-03).**
+- **Rule (decided, Q-03; built at M3).**
   - `ASSET_NAME = STG_BEAUMIER_LOCATION_MAP.HOTEL_NAME` on `HOTEL_CODE`
     exactly, null otherwise. Corporate codes take their map names.
   - `ASSET_NAME_SOURCE` names the source and the `ENTITY_TYPE`.
@@ -123,7 +124,7 @@ Both lanes are rebuilt under their existing names (D-44). No new name.
 | `OPERATING_STATS_PYACT` | source `SCENARIO` | `Actual` | 0 | source name | unchanged |
 | `TRIAL_BALANCE`, branch `ACTUAL_AMOUNT` | unpivoted measure column | null | 16,320 | measure column name | `ACTUAL_AMOUNT` |
 | `TRIAL_BALANCE`, branch `BUDGET_AMOUNT` | unpivoted measure column | null | 16,320 | measure column name | `BUDGET_AMOUNT` |
-| `TRIAL_BALANCE`, branch `FORECAST_AMOUNT` | unpivoted measure column; scenario `FORECAST_VERSION` | `Forecast9` 725, `Forecast10` 2,148, null 13,447 | 13,447 | **source name where given, else column name** (Q-04) | `Forecast9` / `Forecast10` / `FORECAST_AMOUNT` |
+| `TRIAL_BALANCE`, branch `FORECAST_AMOUNT` | unpivoted measure column; scenario `FORECAST_VERSION` | `Forecast9` 725, `Forecast10` 2,148, null 13,447 | 13,447 | **source name where given, else column name** (decided, Q-04) | `Forecast9` / `Forecast10` / `FORECAST_AMOUNT` |
 
 - **TB null total:** 16,320 + 16,320 + 13,447 = 46,087, the same as the
   NEWBURY semantic total of null `SCENARIO` today.

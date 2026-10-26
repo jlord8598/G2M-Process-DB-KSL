@@ -13,6 +13,9 @@ $$
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried verbatim;
 -- SCENARIO is carried once, as the standard column (verbatim; owner Q-07).
 -- No account number: SOURCE_ITEM_ID = LINE_ITEM (D-06). Site = HOTEL_CODE.
+-- ASSET_NAME = STG_BEAUMIER_LOCATION_MAP.HOTEL_NAME on HOTEL_CODE exactly, BMR
+-- and CPH (CORPORATE) included; ASSET_NAME_SOURCE names the source and the
+-- ENTITY_TYPE (build 07 Q-03). The map is unique on HOTEL_CODE (M1).
 -- Every line item is money: AMOUNT. Expenses book negative; as booked.
 -- The source names no total line: IS_SUBTOTAL false.
 -- ============================================================================
@@ -25,7 +28,11 @@ begin
         , 'BEAUMIER'::varchar                                                   as source_lane
         , 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BUDGET'::varchar as source_table
         , nullif(trim(src.hotel_code), '')::varchar                             as source_site_code
-        , null::varchar                                                         as asset_name
+        , loc.hotel_name::varchar                                               as asset_name
+        , case
+              when loc.hotel_name is not null
+                  then 'STG_BEAUMIER_LOCATION_MAP.HOTEL_NAME on HOTEL_CODE; ENTITY_TYPE ' || coalesce(loc.entity_type, '~BLANK~') || ' (build 07 Q-03)'
+          end::varchar                                                          as asset_name_source
         , null::varchar                                                         as department
         , null::varchar                                                         as department_name
         , null::varchar                                                         as account_number
@@ -68,6 +75,8 @@ begin
         , src.source_file_path
         , src.source_row_number
     from CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BUDGET src
+    left join DEV_G2M_AI.STAGING.STG_BEAUMIER_LOCATION_MAP loc
+        on  loc.hotel_code = src.hotel_code
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_BEAUMIER_BUDGET);
