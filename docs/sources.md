@@ -1,145 +1,164 @@
-# Sources - build 07 (rebuild of BEAUMIER and NEWBURY, D-44)
+# Sources — this build
 
-**State: stop 4 (M6 complete).** Written from queries run in this session
-against `CLN.BOX_INVESTMENT_DATA`. The stop-1 proposals Q-01 to Q-05 are
-*decided* (owner, `findings/open-questions.md`); the results are in
-`findings/M3.md` to `M6.md`.
+**This document is written during M1 and is empty before it.** It records what
+this build's lanes actually contain, measured rather than assumed.
 
-**Scope (owner).**
-- **BEAUMIER (rebuild, D-44):**
-  - fill `ASSET_NAME` from `CLN_BEAUMIER_LOCATION_MAP` on an exact
-    hotel-code join;
-  - add `ASSET_NAME_SOURCE`, as for HHG in build 06;
-  - BMR and CPH are corporate entities;
-  - report any hotel code with no match.
-- **NEWBURY (rebuild, D-44):** D-45, so that `SCENARIO` is never null.
-- **No new lanes.** The keys must not move. Builds 03 (BEAUMIER) and 02
-  (NEWBURY) are the record: their profiles stand, and only what the changes
-  touch is re-measured.
+Records of previous builds are in `docs/completed-builds/`. They show how
+similar sources behaved and are useful for knowing what to look for. **They are
+not evidence about this build's sources.**
 
 ---
 
-## Archive check (CLAUDE.md section 2, measured)
+## Source schema
 
-- **The repo is archived:**
-  - `docs/findings/` holds only `.gitkeep`;
-  - `docs/sources.md` was the blank template (7,740 bytes);
-  - `scripts/` holds `parity_check.py`, `check_line_endings.py` and
-    `probes/SPROC_PROBE_FAULT.sql`;
-  - builds 01-06 are in `docs/completed-builds/`;
-  - parity of `sql/` against `DEV_G2M_AI` is 100 of 100, exit 0; line endings
-    are clean.
-- **Untracked files:**
-  - `docs/client-requests/2026-10-26/beaumier_hotels.csv`, to be committed
-    with the first commit (owner; see Q-05);
-  - `Claude outputs/beaumier_hotels.csv`, not mentioned by the owner, left
-    untouched. Its content differs from the first file.
+`CLN.<SOURCE>`: *(fill at M1)*. Load freeze window: *(fill at M1)*.
+Record every in-scope table's `last_altered` at M1 (`CLAUDE.md` D-43).
 
-## Source schema and freeze (D-43)
+## Lane declaration
 
-- **Source:** `CLN.BOX_INVESTMENT_DATA`, 33 tables visible.
-- **Freeze:** the owner's start and end were not given (the request read
-  `<start>` to `<end>`). The database clock at the first query was
-  **2026-10-26 12:39:29.224 PDT** (query `01c7fe9b-010a-58cf-0003-4ff21bf4277a`).
-  **Decided (Q-02): 2026-10-26 12:39:29 PDT to 2026-10-28 12:39 PDT.**
-- **Against earlier records (measured).** The 13 BEAUMIER and NEWBURY tables
-  that builds 02 and 03 read carry the same `last_altered` (2026-10-19
-  15:39-15:41) and row counts. `CLN_BEAUMIER_LOCATION_MAP` is new, loaded
-  2026-10-26 12:03:38.633, before the first query.
+**Ask the owner. Do not infer lane names from source system names.**
 
-**Baseline: every in-scope table's `last_altered`, row count and the sum of
-every numeric column** (query `01c7fe9e-010a-58c4-0003-4ff21bf3e986`).
-
-| Table | Rows | `last_altered` (PDT) | Sums |
-|---|---|---|---|
-| CLN_BEAUMIER_ACCOUNTS | 2,258 | 2026-10-19 15:39:28.345 | ROW_COUNT=53,144 |
-| CLN_BEAUMIER_BP | 35,567 | 2026-10-19 15:39:22.897 | AMOUNT=38,868,453.531294; SOURCE_ROW_NUMBER=157,454,717 |
-| CLN_BEAUMIER_BUDGET | 17,577 | 2026-10-19 15:39:24.788 | AMOUNT=19,866,830.779535; SOURCE_ROW_NUMBER=77,478,004 |
-| CLN_BEAUMIER_CANCELLATIONS | 18,930 | 2026-10-19 15:39:26.608 | OCCUPANCY=4,266,661; ROOMS_REVENUE=2,436,169,569.154831; OCCUPANCY_N_1=4,781,975; ROOMS_REVENUE_N_1=2,586,921,064.715253; OCCUPANCY_N_2=3,671,700; ROOMS_REVENUE_N_2=1,920,085,936.360861; OCCUPANCY_N_3=2,654,606; ROOMS_REVENUE_N_3=1,538,100,952.392782; OCCUPANCY_N_4=2,057,179; ROOMS_REVENUE_N_4=1,202,425,868.0025; OCCUPANCY_N_5=379,237; ROOMS_REVENUE_N_5=190,546,505.63; SOURCE_ROW_NUMBER=61,184,330 |
-| CLN_BEAUMIER_LOCATION_MAP | 13 | 2026-10-26 12:03:38.633 | no numeric column; content hash 3717277118938258010 |
-| CLN_NEWBURY_BOSTON_ACCOUNTS | 770 | 2026-10-19 15:41:03.950 | ROW_COUNT=16,320 |
-| CLN_NEWBURY_BOSTON_OPERATING_STATS_BGT | 365 | 2026-10-19 15:40:46.853 | ROOMS=77,289; REVENUE=46,106,692.2701; SOURCE_ROW_NUMBER=67,160 |
-| CLN_NEWBURY_BOSTON_OPERATING_STATS_EVENTSANDOOO | 426 | 2026-10-19 15:40:53.495 | OUT_OF_ORDER_ROOMS=54; OVERBOOK_ROOMS=null; SOURCE_ROW_NUMBER=98,817 |
-| CLN_NEWBURY_BOSTON_OPERATING_STATS_FCST | 2,190 | 2026-10-19 15:40:48.530 | ROOMS=444,759; REVENUE=291,599,340.6705; SOURCE_ROW_NUMBER=402,960 |
-| CLN_NEWBURY_BOSTON_OPERATING_STATS_PYACT | 2,795 | 2026-10-19 15:40:49.844 | ROOMS=330,220; REVENUE=203,122,723.54; SOURCE_ROW_NUMBER=3,910,205 |
-| CLN_NEWBURY_BOSTON_OPERATING_STATS_SHOPS | 20,048 | 2026-10-19 15:40:51.796 | RATE_VALUE=17,106,633.3; SOURCE_ROW_NUMBER=51,280,888 |
-| CLN_NEWBURY_BOSTON_OTB_1DAY_PICKUP | 75,264 | 2026-10-19 15:40:59.873 | ROOMS=1,364,830; REVENUE=823,772,430.0835; AVAILABLE_ROOMS=21,525,504; SOURCE_ROW_NUMBER=841,568,234 |
-| CLN_NEWBURY_BOSTON_OTB_3DAY_PICKUP | 41,905 | 2026-10-19 15:41:01.771 | ROOMS=759,087; REVENUE=458,444,630.2943; AVAILABLE_ROOMS=11,984,830; SOURCE_ROW_NUMBER=493,118,815 |
-| CLN_NEWBURY_BOSTON_TRIAL_BALANCE | 16,320 | 2026-10-19 15:40:57.687 | ACTUAL_AMOUNT=147,489,864.68; FORECAST_AMOUNT=75,743,308.957604; BUDGET_AMOUNT=208,458,076.386451; ACTUAL_SOURCE_ROW_NUMBER=5,076,458; FORECAST_SOURCE_ROW_NUMBER=1,087,770; BUDGET_SOURCE_ROW_NUMBER=1,902,420 |
-
----
-
-## Tables and lanes (decided, Q-01)
-
-| Table | Lane | Role |
+| Lane | Source tables | Notes |
 |---|---|---|
-| CLN_BEAUMIER_BP, _BUDGET | **BEAUMIER** (rebuild) | facts (build 03) |
-| CLN_BEAUMIER_CANCELLATIONS | **BEAUMIER** | pacing (build 03) |
-| CLN_BEAUMIER_ACCOUNTS | **BEAUMIER** | dictionary (build 03) |
-| CLN_BEAUMIER_LOCATION_MAP | **BEAUMIER** | **new** dictionary: `HOTEL_CODE`, `HOTEL_NAME`, `ENTITY_TYPE` (HOTEL / CORPORATE), 13 rows |
-| CLN_NEWBURY_BOSTON_TRIAL_BALANCE, _OPERATING_STATS_BGT, _PYACT | **NEWBURY** (rebuild) | facts (build 02) |
-| CLN_NEWBURY_BOSTON_OPERATING_STATS_FCST, _OTB_1DAY_PICKUP, _OTB_3DAY_PICKUP, _OPERATING_STATS_SHOPS, _OPERATING_STATS_EVENTSANDOOO | **NEWBURY** | pacing / non-fact (build 02) |
-| CLN_NEWBURY_BOSTON_ACCOUNTS | **NEWBURY** | dictionary (build 02) |
-| CLN_DAVIDSON_* (3), CLN_HERITAGE_GOLF_* (6), CLN_HERSHA_* (3), CLN_INVITED_CLUBS_* (7) | out of scope | covered by the earlier-build baseline |
+| *(fill at M1)* | | |
 
-**Arithmetic:** 14 in scope (BEAUMIER 5, NEWBURY 9) + 19 out of scope = 33
-visible.
+A lane is one coherent source set that gets its own staging models and one
+transformation procedure. Two tenants of one system are usually two lanes, not
+one, if their account vocabularies differ.
 
-## Lane names (D-32)
+**Granted tables.** List everything the role can see, then assign each table to
+a declared lane or mark it out of scope. **Being able to see a table does not
+put it in scope** — a previous build's grants may still be in place. The owner
+confirms before any model is written.
 
-Both lanes are rebuilt under their existing names (D-44). No new name.
+```sql
+select table_schema, table_name, row_count, bytes, last_altered
+from CLN.INFORMATION_SCHEMA.TABLES
+where table_schema = 'CLEAN'
+order by table_name;
+```
 
 ---
 
-## BEAUMIER: `ASSET_NAME` from `LOCATION_MAP` (measured, queries `01c7fe9b-010a-58c4-0003-4ff21bf3e8c2`, `01c7fe9b-010a-58c5-0003-4ff21bf3baca`)
+## What every lane must supply to staging
 
-- **The map.**
-  - 13 rows, unique on `HOTEL_CODE`;
-  - 11 `HOTEL`, 2 `CORPORATE`: `BMR` "Beaumier Corporate", `CPH` "Beaumier
-    Corporate - Exceptional Charges";
-  - names are valid UTF-8 (`Les Trois Vallées` has `C3A9`; `L'Alpaga` has a
-    plain apostrophe).
-- **Every hotel code matches exactly.** BP: 13 of 13 codes, 35,567 rows.
-  BUDGET: 13 of 13, 17,577 rows. ACCOUNTS: 13 of 13 entities.
-  **No hotel code has no match**, and no code needed a case or space match.
-- **Corporate rows.** BMR and CPH: BP 228 rows, BUDGET 120 rows (staged).
-- **Today.** `STG_BEAUMIER_BP` and `_BUDGET` set `ASSET_NAME` null on every
-  row (build 03).
-- **`CANCELLATIONS` (pacing).** It carries `HOTEL_NAME` and no code. Its 11
-  names equal the map's 11 hotel names exactly (query
-  `01c7fe9f-010a-58c5-0003-4ff21bf3bbba`).
-- **Rule (decided, Q-03; built at M3).**
-  - `ASSET_NAME = STG_BEAUMIER_LOCATION_MAP.HOTEL_NAME` on `HOTEL_CODE`
-    exactly, null otherwise. Corporate codes take their map names.
-  - `ASSET_NAME_SOURCE` names the source and the `ENTITY_TYPE`.
-  - The map is staged as `STG_BEAUMIER_LOCATION_MAP`, and the BEAUMIER MAIN
-    calls dictionaries before facts.
-  - CANCELLATIONS is unchanged.
+**Every fact staging table** supplies all of these; the classification join
+needs them. A lane missing one is a finding to raise, not a gap to work around
+— except `SOURCE_LINE_KEY`, which may be null if the source has no natural line
+identifier. **Pacing and dictionary staging tables keep their own shape**, plus
+`RUN_ID`, `SOURCE_LANE` and `SOURCE_TABLE`; they never feed the seeder.
 
-## NEWBURY: D-45 (measured, queries `01c7fe9c-010a-58c4-0003-4ff21bf3e8f6`, `01c7fe9d-010a-58c5-0003-4ff21bf3baf6`, `01c7fe9d-010a-58d2-0003-4ff21bf3f8de`)
+| | Used for |
+|---|---|
+| `SOURCE_LANE` | Key part. The declared lane name. |
+| `SOURCE_SITE_CODE` | Key part. The lane's own site, property or entity identifier. |
+| `DEPARTMENT` | Key part, as the source holds it. |
+| `ACCOUNT_NUMBER` | Raw, malformed and blank included. |
+| `STAT_ACCOUNT` | Raw, where the lane has one. |
+| `ACCOUNT_KEY` | `coalesce(nullif(trim(ACCOUNT_NUMBER),''), nullif(trim(STAT_ACCOUNT),''), '~BLANK~')`, built here. |
+| `RECORD_TYPE` | Key part. `AMOUNT` or `STATISTIC`, normalised here. |
+| `RECORD_TYPE_SOURCE` | The stating column, or the derivation rule. Never null. |
+| `STAT_UNIT_FAMILY` | Where a row carries both a money amount and a statistic value (D-29). |
+| `ACCOUNT_DESC` | Carried, and shown in the review report. |
+| `ASSET_NAME` | The site or property name, where a dimension supplies one. |
+| `DEPARTMENT_NAME` | Where the lane supplies one; null otherwise. |
+| `PERIOD_END` | A date, derived per lane. |
+| `SCENARIO` | The named scenario, verbatim; where the source names none, the stating table or measure column name (D-45). Never null. |
+| `SOURCE_AMOUNT` | As booked, **sign included**. Never strip a negative - that is a silent repair (invariant 3). |
+| `STAT_VALUE` | Where the lane holds a statistic measure. |
+| `IS_SUBTOTAL` | The source's own total or rollup row. Default `FALSE`. |
+| `SUBTOTAL_SOURCE` | How a subtotal was identified, or that the source gives no way to tell. |
+| `SOURCE_TABLE` | Which source table the row came from. Never null. |
+| `SOURCE_LINE_KEY` | The natural key making a source row addressable, or null. |
 
-| Model | Category from | `SCENARIO` today | Null | D-45 rule | Value |
-|---|---|---|---|---|---|
-| `OPERATING_STATS_BGT` | source `SCENARIO` | `Budget` | 0 | source name | unchanged |
-| `OPERATING_STATS_PYACT` | source `SCENARIO` | `Actual` | 0 | source name | unchanged |
-| `TRIAL_BALANCE`, branch `ACTUAL_AMOUNT` | unpivoted measure column | null | 16,320 | measure column name | `ACTUAL_AMOUNT` |
-| `TRIAL_BALANCE`, branch `BUDGET_AMOUNT` | unpivoted measure column | null | 16,320 | measure column name | `BUDGET_AMOUNT` |
-| `TRIAL_BALANCE`, branch `FORECAST_AMOUNT` | unpivoted measure column; scenario `FORECAST_VERSION` | `Forecast9` 725, `Forecast10` 2,148, null 13,447 | 13,447 | **source name where given, else column name** (decided, Q-04) | `Forecast9` / `Forecast10` / `FORECAST_AMOUNT` |
+---
 
-- **TB null total:** 16,320 + 16,320 + 13,447 = 46,087, the same as the
-  NEWBURY semantic total of null `SCENARIO` today.
-- **The 13,447 forecast rows with no version** are exactly the rows whose
-  `FORECAST_AMOUNT` is null. They are empty cells dated 2025-01-31 to
-  2026-09-30, before the forecast horizon. Every versioned row has an amount.
-- **Not covered by D-45 (not fact rows):** FCST, OTB_1DAY, OTB_3DAY, SHOPS
-  and EVENTSANDOOO are pacing or non-fact. They have no semantic table and,
-  except FCST, no `SCENARIO` column. Unchanged.
+## Per-lane findings
 
-## Keys
+**One section per lane, written as M1 measures it.** Mark every statement
+*measured*, meaning confirmed against this extract, or *unverified*, meaning
+noted but not tested.
 
-Neither change touches a key part (`ASSET_NAME` and `SCENARIO` are not in
-the five-part key). The D-44 key report runs at M4 for both lanes.
+For each lane, establish and record:
+
+**Shape.** Long or wide. If wide, how many columns are unpivoted — count them;
+do not assume twelve.
+
+**The account number.** Its structure, how reliably it parses, and what
+fraction of rows conform.
+
+**The section source.** A digit in the account code — and *which position*,
+since this differs by lane — or a dictionary that states the section outright,
+or neither.
+
+**`RECORD_TYPE`.** A column that states it, or the rule used to derive it.
+**Check specifically whether the same account number appears as both an amount
+row and a statistic row.** If it does, `RECORD_TYPE` in the key is what keeps
+those two populations apart, and without it one is permanently misrouted.
+
+**Statistic unit vocabulary.** What identifies a statistic's unit, and the full
+list of values. Enumerate every run if the list can grow. Record the source's
+own codes and any names the source itself states; do not invent labels (D-38).
+
+**Category.** Which column or table says actual, budget or forecast, and the
+full catalogue of values it can take. State the category for **every** fact
+table, including those with no scenario column. Values you cannot map are
+questions for the owner, not blockers; they route to `UNKNOWN` until answered.
+
+**Status and state columns.** Any posted/pending flag, batch status or export
+state. Record its values and what they appear to mean; it is carried as an
+attribute and does not decide category unless the owner says so.
+
+**Coverage period of each fact table.** The first and last date each one
+covers. Two tables can only be compared over periods both cover completely; a
+partial month against a full one proves nothing.
+
+**Scenario.** The named scenarios within each category.
+
+**Period.** How a date is derived.
+
+**Blank and malformed populations.** How many rows carry no account number, no
+department, or a code that does not parse. Report; never repair. **For a large
+blank-account population, profile it by every column it does carry** (an item
+tag, a description, which measures are populated) and look for a link the
+source states to a row that has an account number. A link the source states is
+usable; a match on description wording alone is not.
+
+**Dictionaries.** What each one supplies, whether it is unique on its own key,
+and which fact combinations it fails to cover.
+
+**How accounts map onto the standard hierarchy.** Which `H2` Level 1 value each
+part of the chart belongs to, and whether anything identifies a Level 2
+sub-category outright. Record the mapping; do not guess Level 2 from loose
+description matches.
+
+**Pacing and pickup sources.** Any table whose name or content suggests a
+forward booking position, a pace against prior, or a pickup between snapshots.
+For each, establish **whether an as-of date exists distinct from the period it
+describes** — on the row, or implied by one extract per snapshot. **If neither,
+say so: the source holds only current values and pacing cannot be built from
+it.** Never synthesise a snapshot date. Record the table's own shape; the
+pacing stream keeps it rather than conforming to the semantic common block.
+**Test every code column in a pacing table against the GL account format**
+before anything treats it as an account; it is usually a client, CRM or rate
+code. Pacing tables never feed the seeder (D-37).
+
+**Subtotal and rollup rows.** How the source marks its own total lines — a
+level or depth column, a total flag, a description that names a section rather
+than an account, a site or department value that is a rollup rather than a real
+one. **If the source gives no way to tell, say so.** An unmarked subtotal is a
+known gap; a wrongly marked detail row is a silently missing figure.
+
+**Duplicates.** Overlapping extracts or repeated lines within one file. All are
+kept (D-25) and tagged with `SOURCE_TABLE`; record what they are so a consumer
+knows.
+
+**Anything surprising.** A constant column, a flag nobody mentioned, a label
+that contradicts its contents.
+
+---
 
 ## Corrections
 
-None yet.
+**When a measurement contradicts something written here, correct it and say
+so.** A finding that a documented rule is wrong is worth more than a clean run.
