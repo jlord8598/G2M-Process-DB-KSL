@@ -3,7 +3,19 @@
 Numbered within this build. The decisions of builds 02 (NEWBURY) and 03
 (BEAUMIER) carry over unchanged, except the changes declared for this build.
 
-## Open at stop 1
+## Answered at stop 1 (owner, 2026-10-26)
+
+| # | Answer |
+|---|---|
+| Q-01 | **Approved.** BEAUMIER and NEWBURY are rebuilt; all other lanes are out of scope. |
+| Q-02 | **Freeze 2026-10-26 12:39:29 PDT to 2026-10-28 12:39 PDT.** If M6 will not finish before then, stop and report. |
+| Q-03 | **Approved.** BMR and CPH take their map names; `ASSET_NAME_SOURCE` records the source and the corporate flag. The map is staged as a BEAUMIER dictionary, called before the facts. CANCELLATIONS unchanged. |
+| Q-04 | **Approved.** TB ACTUAL and BUDGET get `ACTUAL_AMOUNT` / `BUDGET_AMOUNT`; FORECAST keeps `FORECAST_VERSION` where present, `FORECAST_AMOUNT` where empty. |
+| Q-05 | **Regenerate** `beaumier_hotels.csv` from `CLN_BEAUMIER_LOCATION_MAP`, UTF-8 with BOM, and commit the fix. Leave the untracked outputs file alone. |
+
+DDL is approved through M6 for BEAUMIER and NEWBURY objects only.
+
+## Raised at stop 1
 
 | # | Lane | Question | Blocks | Proposal |
 |---|---|---|---|---|
