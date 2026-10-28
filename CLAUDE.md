@@ -793,43 +793,65 @@ master, by people.
 ### Seeding the hierarchy from a section digit
 
 Most financial sources number accounts on a conventional scheme. Where a lane
-carries a section digit, this is the best guess it seeds:
+carries a section digit, it seeds **`H1` only**:
 
-| Digit | `H1` | `H2` |
-|---|---|---|
-| 1 | Balance Sheet | `Assets` |
-| 2 | Balance Sheet | `Liabilities` |
-| 3 | Balance Sheet | `Equity` |
-| 4 | Revenue | `Revenue` |
-| 5 | Expense | `Cost of Goods Sold` |
-| 6 | Expense | `Payroll` |
-| 7 | Expense | `Operating Expenses` |
-| 8 | Below the Line | `Other Income / (Expense)` |
-| 9 | Allocations & Reserves | `UNCLASSIFIED` |
+| Digit | `H1` |
+|---|---|
+| 1, 2, 3 | Balance Sheet |
+| 4 | Revenue |
+| 5, 6, 7 | Expense |
+| 8 | Below the Line |
+| 9 | Allocations & Reserves |
+
+**`H2` seeds `UNCLASSIFIED` unless the lane's own `H2` mapping (below)
+assigns it.** A digit says which statement an account belongs to, not which
+Level 1 section.
 
 **Which digit, and where it sits, is established per lane at M1** — it may be
 the leading digit of a whole code, of a middle segment, or absent entirely.
 Never carry one lane's position to another.
 
-**The digit reaches Level 1 and no further.** `H3` is not derivable from a
-digit and seeds `UNCLASSIFIED` unless the source supplies something better — a
-dictionary that states a sub-category, or an account description that matches a
-Level 2 name unambiguously. **Do not keyword-guess `H3` from loose description
-matches;** a wrong Level 2 that looks settled is worse than an honest
-`UNCLASSIFIED`.
+### `H2` comes from a per-lane mapping
 
-**Two Level 1 values have no digit of their own.**
-`Depreciation & Amortization` and `Income Taxes` usually sit inside a 7 or 8
-range, so the digit alone cannot find them. Where a source dictionary or a
-clear description identifies them, seed them; otherwise they arrive as
-`Operating Expenses` or `Other Income / (Expense)` and get corrected in the
-master. **Report how many accounts this affects** so the owner knows what is
-waiting.
+**`H2` is assigned by a mapping established at M1 from that lane's own
+evidence**, of one of three kinds:
+
+- **account blocks**: numbered ranges the lane's chart groups together, shown
+  by the data;
+- **a source dictionary or class**: a column that states the section in words;
+- **a hierarchy parent**: the rollup or total line an account sits under.
+
+**Record the mapping in `docs/sources.md`** with the evidence for each entry
+and example accounts. **It needs the owner's approval at stop 1 or stop 3,
+like any other mapping**, before the seeder that uses it is written at M4.
+Where nothing in the lane supports an entry, `H2` stays `UNCLASSIFIED` and is
+corrected in the master.
+
+**Never reuse another lane's mapping**, including a lane of the same company
+or the same source system. A mapping is evidence about one chart.
+
+**At M1, report each lane's chart structure**: how accounts are numbered
+(segments, lengths, where the digit sits), how they are grouped (blocks,
+classes, parents), and how many accounts each group holds, so the owner can
+approve the `H2` mapping before M4.
+
+**The mapping reaches Level 1 and no further.** `H3` is not derivable from a
+digit or a block and seeds `UNCLASSIFIED` unless the source supplies something
+better — a dictionary that states a sub-category, or an account description
+that matches a Level 2 name unambiguously. **Do not keyword-guess `H3` from
+loose description matches;** a wrong Level 2 that looks settled is worse than
+an honest `UNCLASSIFIED`.
+
+**`Depreciation & Amortization` and `Income Taxes` are often hard to find.**
+They tend to sit inside an operating or below-the-line block. Where the lane's
+evidence identifies them, map them; otherwise they take whatever the approved
+mapping gives their block, or `UNCLASSIFIED`, and get corrected in the master.
+**Report how many accounts this affects** so the owner knows what is waiting.
 
 **Where a lane has no digit**, a source dictionary usually states a section in
-words. Map its vocabulary onto `H1`/`H2` above at M1 and record the mapping in
-`docs/sources.md`. A source section that mixes income and expense maps to
-`Below the Line`, not to `Expense`.
+words. Map its vocabulary onto `H1`/`H2` at M1 under the same rules and record
+the mapping in `docs/sources.md`. A source section that mixes income and
+expense maps to `Below the Line`, not to `Expense`.
 
 **Unit families for statistics come out of M1 profiling per lane.**
 
@@ -1464,7 +1486,7 @@ and then it changes here, for every build after.
 | D-08 | Blank key parts | `'~BLANK~'`, identical expression at seed and at join. |
 | D-09 | `H1` | The statement. Seven values, exhaustive, never null, and the only thing that routes a row. |
 | D-10 | `H2` | Section for money, unit family for statistics. |
-| D-11 | The hierarchy | `H2` is Level 1 and `H3` is Level 2 of the standard chart of accounts in §5, fixed across every build. `H4` and `H5` are reserved and seed `UNCLASSIFIED`. A section digit reaches Level 1 and no further; `H3` seeds `UNCLASSIFIED` unless the source states a sub-category outright. Loose keyword guessing at Level 2 is rejected. |
+| D-11 | The hierarchy | `H2` is Level 1 and `H3` is Level 2 of the standard chart of accounts in §5, fixed across every build. `H4` and `H5` are reserved and seed `UNCLASSIFIED`. The lane's `H2` mapping reaches Level 1 and no further; `H3` seeds `UNCLASSIFIED` unless the source states a sub-category outright. Loose keyword guessing at Level 2 is rejected. |
 | D-12 | `P_L_SECTION` and `NORMAL_BALANCE` | A fixed function of `H2`, never guessed independently and never set per account. Asserted by check 2(k). |
 | D-13 | Polarity | `VALUE_SIGN` follows `NORMAL_BALANCE`: Credit `+1`, Debit `-1`, Mixed null, and null outside the income statement. `SOURCE_AMOUNT` is carried as booked with the source's own signs; `VALUE` is null wherever the sign is. |
 | D-14 | The merge | Insert-only on classification columns; an existing key has only `LAST_SEEN_RUN_ID` updated. `CREATE TABLE IF NOT EXISTS` precedes it every run. |
@@ -1499,6 +1521,7 @@ and then it changes here, for every build after.
 | D-43 | Held source | Each build declares one source schema `CLN.<SOURCE>` and reads it directly under a load freeze the owner arranges for the build. M1 records every in-scope table's `last_altered`; a change before any milestone's checks is a stop. |
 | D-44 | Rebuilding a lane | The owner may declare existing lanes rebuilt at M1. The build may replace those lanes' code, seeder branch and lane blocks, and retire objects only they used. Classification rows are never deleted. The key rule is unchanged, and M4 proves it: existing keys reproduced, new keys explained by new data, dead keys kept. Any existing account appearing under a different key is a stop. |
 | D-45 | Scenario never null | Where the source names a scenario, SCENARIO is that name verbatim. Where it names none and the category comes from the source table or an unpivoted measure column, SCENARIO is that table name (no schema) or column name, verbatim. Applied to each lane at its next build or rebuild. |
+| D-46 | `H2` seeding | A section digit seeds `H1` only (1-3 Balance Sheet, 4 Revenue, 5-7 Expense, 8 Below the Line, 9 Allocations & Reserves); `H2` seeds `UNCLASSIFIED` unless the lane's mapping assigns it. `H2` comes from a per-lane mapping established at M1 from that lane's own evidence (account blocks, a source dictionary or class, or a hierarchy parent), recorded in `docs/sources.md` with examples and approved by the owner at stop 1 or stop 3 like any other mapping. M1 reports each lane's chart structure so the mapping is approved before M4. Never reuse another lane's mapping. Recorded from Q-13 (INVITED_CLUBS) and Q-09 (DAVIDSON). |
 
 ### Questions
 
