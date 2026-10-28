@@ -134,7 +134,11 @@ Ask first:
   the next stop.
 - **Anything touching `XREF_ACCOUNT_CLASSIFICATION` other than the seeder's own
   `CREATE TABLE IF NOT EXISTS` and `MERGE`.** It is the only table not rebuilt from source each run, and the
-  review report depends on it being stable within a build.
+  review report depends on it being stable within a build. A D-44 re-seed is
+  allowed without a further prompt only for a lane the owner declared rebuilt
+  AND whose changed H2 mapping the owner approved at stop 1 or stop 3; that
+  approval covers running it. Anything else touching those rows still asks
+  first.
 - `git` operations beyond reading status and diffs
 
 Never:
@@ -147,7 +151,8 @@ Never:
 - Edit, redeploy, drop or call another build's lane objects, edit another
   lane's seeder branch or semantic lane block, or change another lane's
   classification rows (`CLAUDE.md` D-42), except for lanes the owner has
-  declared rebuilt (D-44), and even then never their classification rows
+  declared rebuilt (D-44), and even then never their classification rows,
+  except a re-seed under D-44.
 - **Archive the previous build.** Moving `docs/findings/`, `docs/sources.md`,
   `scripts/run_build.sql` and the reconcile scripts into
   `docs/completed-builds/` is the owner's job, done between builds. `sql/` is

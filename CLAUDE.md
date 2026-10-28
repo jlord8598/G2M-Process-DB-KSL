@@ -119,8 +119,8 @@ lane the build may:
   table in `DEV_G2M_AI` and remove its file from `sql/`). In a promoted
   environment the owner drops them by hand, because promotion never deletes.
 
-It may not delete or update the lane's classification rows. The merge stays
-insert-only (the build's own snapshot; the master follows D-47): existing keys keep their classification, and only keys new to
+It may not delete or update the lane's classification rows (except a re-seed under D-44). The merge stays
+insert-only (the build's own snapshot, except a re-seed under D-44; the master follows D-47): existing keys keep their classification, and only keys new to
 this extract are proposed.
 
 **A rebuild must prove its keys did not move.** The key rule (D-05, D-06,
@@ -910,7 +910,7 @@ Four steps, in order, every run.
    `SEED_SOURCE` says so.
 3. **Merge.** A key not present is inserted with its proposal and
    `REVIEW_STATUS = 'UNREVIEWED'`. A key already present has
-   **`LAST_SEEN_RUN_ID` updated and nothing else touched.**
+   **`LAST_SEEN_RUN_ID` updated and nothing else touched** (except a re-seed under D-44).
 4. **Join and route.** Transformation left-joins on the five-part key, appends
    the classification, applies the sign, routes on `H1`.
 
@@ -923,8 +923,8 @@ with its own lane, so a call seeds only that lane's keys.
 runs on the row-level path. Category derivation is separate and necessarily
 row-level (§6).
 
-**A proposal competes with nothing.** The merge never touches an existing row,
-so there is no precedence mechanism and none is to be built.
+**A proposal competes with nothing.** The merge never touches an existing row
+(except a re-seed under D-44), so there is no precedence mechanism and none is to be built.
 
 **Dead keys are not deleted.** Extracts vary. `LAST_SEEN_RUN_ID` makes a key
 that stopped appearing visible.
@@ -1370,7 +1370,7 @@ milestone **M*n***; there is no offset.
 | 1 | M1, after listing the granted tables and proposing how they group | The owner's lane names and scope |
 | 2 | End of M1 | Approval of the findings and open questions |
 | 3 | End of M3 | Approval of staging |
-| 4 | End of M6 | Approval of the build. For a rebuilt lane, also: classification changes vs the previous `DEV_G2M_AI` snapshot — keys whose `H1`/`H2` would change, old → new, with counts. The owner's step 2 query in the merge script is the definitive check against the master. |
+| 4 | End of M6 | Approval of the build. For a rebuilt lane, also: classification changes vs the previous `DEV_G2M_AI` snapshot — keys whose `H1`/`H2` would change, old → new, with counts; these are exactly the rows of the snapshot re-seeded under D-44. The owner's step 2 query in the merge script is the definitive check against the master. |
 
 M2, M4 and M5 run straight on once their checks pass. **Stop anyway, at any
 point, when:**
@@ -1479,7 +1479,7 @@ and then it changes here, for every build after.
 | D-01 | Filtering | Invariant 1. |
 | D-02 | Aggregation | Invariant 2. |
 | D-03 | `CLN.XREF` | Not read by the pipeline, ever. Classification is derived from the staged source. The master table in that schema is written by promotion only, outside the build. |
-| D-04 | The classifier | `XREF_ACCOUNT_CLASSIFICATION` is the only classifier. Derivation proposes at insert; after insert a row is never re-proposed. No runtime precedence exists and none is to be built. |
+| D-04 | The classifier | `XREF_ACCOUNT_CLASSIFICATION` is the only classifier. Derivation proposes at insert; after insert a row is never re-proposed (except a re-seed under D-44). No runtime precedence exists and none is to be built. |
 | D-05 | Classification grain | Five parts: lane, site, department, `ACCOUNT_KEY`, `RECORD_TYPE`. Unique. No wildcards, no inheritance, no precedence. |
 | D-06 | `ACCOUNT_KEY` | `coalesce(nullif(trim(ACCOUNT_NUMBER),''), nullif(trim(STAT_ACCOUNT),''), nullif(trim(SOURCE_ITEM_ID),''), '~BLANK~')`, built in staging, raw columns carried alongside. `SOURCE_ITEM_ID` is the lane's own line-item identifier, declared at M1, null where the lane has none. The `nullif(trim())` is not optional — without it an empty string becomes the key instead of the sentinel. No lane-specific exception. |
 | D-07 | `RECORD_TYPE` | In the key, normalised in staging. Where a lane does not state it, staging derives it — the one declared exception to staging doing no classification — and records the rule in `RECORD_TYPE_SOURCE`. |
@@ -1489,7 +1489,7 @@ and then it changes here, for every build after.
 | D-11 | The hierarchy | `H2` is Level 1 and `H3` is Level 2 of the standard chart of accounts in §5, fixed across every build. `H4` and `H5` are reserved and seed `UNCLASSIFIED`. The lane's `H2` mapping reaches Level 1 and no further; `H3` seeds `UNCLASSIFIED` unless the source states a sub-category outright. Loose keyword guessing at Level 2 is rejected. |
 | D-12 | `P_L_SECTION` and `NORMAL_BALANCE` | A fixed function of `H2`, never guessed independently and never set per account. Asserted by check 2(k). |
 | D-13 | Polarity | `VALUE_SIGN` follows `NORMAL_BALANCE`: Credit `+1`, Debit `-1`, Mixed null, and null outside the income statement. `SOURCE_AMOUNT` is carried as booked with the source's own signs; `VALUE` is null wherever the sign is. |
-| D-14 | The merge | Insert-only (the build's own snapshot; the master follows D-47) on classification columns; an existing key has only `LAST_SEEN_RUN_ID` updated. `CREATE TABLE IF NOT EXISTS` precedes it every run. |
+| D-14 | The merge | Insert-only (the build's own snapshot, except a re-seed under D-44; the master follows D-47) on classification columns; an existing key has only `LAST_SEEN_RUN_ID` updated. `CREATE TABLE IF NOT EXISTS` precedes it every run. |
 | D-15 | Persistence | The classification table persists across runs **and across builds**, one set of rows per lane, which keeps the review report stable. A build seeds only its own lanes, and nothing is ever read back into it. |
 | D-16 | Category | A column in transformation. In semantic the income statement splits into three tables by category; balance sheet and operating metrics each carry `CATEGORY` in one table. |
 | D-17 | Scenario | Never flattened, never merged, always verbatim. An unresolved category sends the whole row to `UNKNOWN`. |
@@ -1519,7 +1519,7 @@ and then it changes here, for every build after.
 | D-41 | Unresolved categories | Never blocking. Unanswered values route to `UNKNOWN`; a status column is an attribute, not a category signal. |
 | D-42 | Accumulation | A build creates and changes only its own lanes' objects. To shared code it only adds: a branch to the seeder and a lane block to each of the six semantic models. Earlier builds' MAINs are never called, and check 5 proves earlier lanes are unchanged. Except for lanes the owner declares rebuilt (D-44). |
 | D-43 | Held source | Each build declares one source schema `CLN.<SOURCE>` and reads it directly under a load freeze the owner arranges for the build. M1 records every in-scope table's `last_altered`; a change before any milestone's checks is a stop. |
-| D-44 | Rebuilding a lane | The owner may declare existing lanes rebuilt at M1. The build may replace those lanes' code, seeder branch and lane blocks, and retire objects only they used. Classification rows are never deleted. The key rule is unchanged, and M4 proves it: existing keys reproduced, new keys explained by new data, dead keys kept. Any existing account appearing under a different key is a stop. |
+| D-44 | Rebuilding a lane | The owner may declare existing lanes rebuilt at M1. The build may replace those lanes' code, seeder branch and lane blocks, and retire objects only they used. Classification rows are never deleted. The key rule is unchanged, and M4 proves it: existing keys reproduced, new keys explained by new data, dead keys kept. Any existing account appearing under a different key is a stop. Exception: when the owner approves a changed H2 mapping for a rebuilt lane (D-46), the build re-seeds that lane's classification columns in its own snapshot (DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION). Keys are never added, removed or moved by this; only H1-H5, section, balance, sign and seed source change. The master is updated only through D-47. |
 | D-45 | Scenario never null | Where the source names a scenario, SCENARIO is that name verbatim. Where it names none and the category comes from the source table or an unpivoted measure column, SCENARIO is that table name (no schema) or column name, verbatim. Applied to each lane at its next build or rebuild. |
 | D-46 | `H2` seeding | A section digit seeds `H1` only (1-3 Balance Sheet, 4 Revenue, 5-7 Expense, 8 Below the Line, 9 Allocations & Reserves); `H2` seeds `UNCLASSIFIED` unless the lane's mapping assigns it. `H2` comes from a per-lane mapping established at M1 from that lane's own evidence (account blocks, a source dictionary or class, or a hierarchy parent), recorded in `docs/sources.md` with examples and approved by the owner at stop 1 or stop 3 like any other mapping. M1 reports each lane's chart structure so the mapping is approved before M4. Never reuse another lane's mapping. Recorded from Q-13 (INVITED_CLUBS) and Q-09 (DAVIDSON). |
 | D-47 | Guarded master merge | Promotion step 1 is a guarded merge into CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY, run by the owner after approval (script: "Claude outputs/MASTER_MERGE_D47.sql"). New keys are inserted. An existing key is updated only when REVIEWED_BY is null and the approved seed changed; the old row is archived to KSL_MASTER_ACCOUNT_HIERARCHY_HISTORY first. Rows a person reviewed are never changed, only listed. SPROC_RUN_PIPELINE stays insert-only. The build itself still never reads or writes the master. |
