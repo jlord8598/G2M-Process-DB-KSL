@@ -14,9 +14,6 @@
 --
 -- What it rewrites in each body:
 --   - every qualified '<FROM>.' reference becomes '<TO>.'
---   - 'CLN.<SOURCE>_BUILD.' (a build's frozen source clone) becomes
---     'CLN.<SOURCE>.', e.g. CLN.BOX_INVESTMENT_DATA_BUILD. ->
---     CLN.BOX_INVESTMENT_DATA.; no promoted procedure may read a clone
 --   - from DEV_G2M_AI only: each SPROC_XFRM_{LANE} classification CTE is
 --     pointed at CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY. Every lane proc must
 --     swap exactly once. From any other source the procs must already read
@@ -54,7 +51,6 @@ declare
     e_swap   exception (-20004, 'SPROC_PROMOTE: classification CTE swap count does not match the transformation lane procedures.');
     e_xref   exception (-20005, 'SPROC_PROMOTE: a transformation procedure outside DEV_G2M_AI still reads a build classification table.');
     e_verify exception (-20006, 'SPROC_PROMOTE: target does not hold every promoted procedure after the run.');
-    e_clone  exception (-20007, 'SPROC_PROMOTE: a CLN.<SOURCE>_BUILD reference survived the rewrite.');
 begin
     -- ------------------------------------------------------------------------
     -- allowed paths only; this also keeps the names safe for dynamic SQL
@@ -118,12 +114,6 @@ begin
         v_ddl := regexp_replace(v_ddl, '(^|[^A-Za-z0-9_])"?' || v_from || '"?\\.', '\\1' || v_to || '.', 1, 0, 'i');
         if (regexp_count(v_ddl, '(^|[^A-Za-z0-9_])"?' || v_from || '"?\\.', 1, 'i') > 0) then
             raise e_left;
-        end if;
-
-        -- frozen source clone -> live source
-        v_ddl := regexp_replace(v_ddl, '"?CLN"?\\."?([A-Za-z0-9_]+)_BUILD"?\\.', 'CLN.\\1.', 1, 0, 'i');
-        if (regexp_count(v_ddl, 'CLN\\.[A-Za-z0-9_]+_BUILD\\.', 1, 'i') > 0) then
-            raise e_clone;
         end if;
 
         if (not P_DRY_RUN) then
