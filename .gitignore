@@ -7,4 +7,6 @@ connections.toml
 .vscode/
 __pycache__/
 *.log
-Claude outputs/
+Claude outputs/*
+!Claude outputs/SPROC_PROMOTE.sql
+!Claude outputs/SPROC_RUN_PIPELINE.sql
