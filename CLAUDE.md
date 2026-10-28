@@ -120,7 +120,7 @@ lane the build may:
   environment the owner drops them by hand, because promotion never deletes.
 
 It may not delete or update the lane's classification rows. The merge stays
-insert-only: existing keys keep their classification, and only keys new to
+insert-only (the build's own snapshot; the master follows D-47): existing keys keep their classification, and only keys new to
 this extract are proposed.
 
 **A rebuild must prove its keys did not move.** The key rule (D-05, D-06,
@@ -713,7 +713,7 @@ attribute in the extract step.** Not `ANY_VALUE`, and not "the row that created
 the key" — every row of that key in the first run qualifies, so neither
 identifies one row.
 
-**Check 5 would not catch this**, because the insert-only merge freezes the
+**Check 5 would not catch this**, because the insert-only merge (the build's own snapshot; the master follows D-47) freezes the
 attributes after the first run and a second run inserts nothing. The risk is
 one run further out: two clean builds of the same company, on the same extract,
 showing different descriptions with nothing to explain the difference.
@@ -1052,7 +1052,7 @@ scope entirely (D-03) — no legacy lookup in that schema is consulted.
 | `SPROC_XFRM_{LANE}` and `SPROC_XFRM_{LANE}_MAIN` | Moved whole; the one marked classification CTE is pointed at the master. |
 | `SPROC_SEM_AI_*` | Moved whole. They union every lane of this process, and `SEM_AI_*` in the target holds nothing else. |
 | The seeder and `SPROC_XREF_{LANE}_MAIN` | Moved whole; each promoted environment seeds its own snapshot. |
-| `XREF_ACCOUNT_CLASSIFICATION` rows | Inserted into the master by the owner at the build's first promotion, checking for existing keys (Snowflake does not enforce the master's primary key). After that, `CLN.UTIL.SPROC_RUN_PIPELINE` inserts each run's new keys itself. |
+| `XREF_ACCOUNT_CLASSIFICATION` rows | Merged into the master by the owner at promotion step 1, under the guarded merge of D-47 (`Claude outputs/MASTER_MERGE_D47.sql`; Snowflake does not enforce the master's primary key). After that, `CLN.UTIL.SPROC_RUN_PIPELINE` inserts each run's new keys itself. |
 | `scripts/run_build.sql` | Build tool; not promoted. A promoted environment runs through `CLN.UTIL.SPROC_RUN_PIPELINE`. |
 
 `CLN.UTIL.SPROC_PROMOTE(FROM, TO, DRY_RUN)` does every code move above, along
@@ -1370,7 +1370,7 @@ milestone **M*n***; there is no offset.
 | 1 | M1, after listing the granted tables and proposing how they group | The owner's lane names and scope |
 | 2 | End of M1 | Approval of the findings and open questions |
 | 3 | End of M3 | Approval of staging |
-| 4 | End of M6 | Approval of the build |
+| 4 | End of M6 | Approval of the build. For a rebuilt lane, also: classification changes vs the previous `DEV_G2M_AI` snapshot — keys whose `H1`/`H2` would change, old → new, with counts. The owner's step 2 query in the merge script is the definitive check against the master. |
 
 M2, M4 and M5 run straight on once their checks pass. **Stop anyway, at any
 point, when:**
@@ -1489,7 +1489,7 @@ and then it changes here, for every build after.
 | D-11 | The hierarchy | `H2` is Level 1 and `H3` is Level 2 of the standard chart of accounts in §5, fixed across every build. `H4` and `H5` are reserved and seed `UNCLASSIFIED`. The lane's `H2` mapping reaches Level 1 and no further; `H3` seeds `UNCLASSIFIED` unless the source states a sub-category outright. Loose keyword guessing at Level 2 is rejected. |
 | D-12 | `P_L_SECTION` and `NORMAL_BALANCE` | A fixed function of `H2`, never guessed independently and never set per account. Asserted by check 2(k). |
 | D-13 | Polarity | `VALUE_SIGN` follows `NORMAL_BALANCE`: Credit `+1`, Debit `-1`, Mixed null, and null outside the income statement. `SOURCE_AMOUNT` is carried as booked with the source's own signs; `VALUE` is null wherever the sign is. |
-| D-14 | The merge | Insert-only on classification columns; an existing key has only `LAST_SEEN_RUN_ID` updated. `CREATE TABLE IF NOT EXISTS` precedes it every run. |
+| D-14 | The merge | Insert-only (the build's own snapshot; the master follows D-47) on classification columns; an existing key has only `LAST_SEEN_RUN_ID` updated. `CREATE TABLE IF NOT EXISTS` precedes it every run. |
 | D-15 | Persistence | The classification table persists across runs **and across builds**, one set of rows per lane, which keeps the review report stable. A build seeds only its own lanes, and nothing is ever read back into it. |
 | D-16 | Category | A column in transformation. In semantic the income statement splits into three tables by category; balance sheet and operating metrics each carry `CATEGORY` in one table. |
 | D-17 | Scenario | Never flattened, never merged, always verbatim. An unresolved category sends the whole row to `UNKNOWN`. |
@@ -1522,6 +1522,7 @@ and then it changes here, for every build after.
 | D-44 | Rebuilding a lane | The owner may declare existing lanes rebuilt at M1. The build may replace those lanes' code, seeder branch and lane blocks, and retire objects only they used. Classification rows are never deleted. The key rule is unchanged, and M4 proves it: existing keys reproduced, new keys explained by new data, dead keys kept. Any existing account appearing under a different key is a stop. |
 | D-45 | Scenario never null | Where the source names a scenario, SCENARIO is that name verbatim. Where it names none and the category comes from the source table or an unpivoted measure column, SCENARIO is that table name (no schema) or column name, verbatim. Applied to each lane at its next build or rebuild. |
 | D-46 | `H2` seeding | A section digit seeds `H1` only (1-3 Balance Sheet, 4 Revenue, 5-7 Expense, 8 Below the Line, 9 Allocations & Reserves); `H2` seeds `UNCLASSIFIED` unless the lane's mapping assigns it. `H2` comes from a per-lane mapping established at M1 from that lane's own evidence (account blocks, a source dictionary or class, or a hierarchy parent), recorded in `docs/sources.md` with examples and approved by the owner at stop 1 or stop 3 like any other mapping. M1 reports each lane's chart structure so the mapping is approved before M4. Never reuse another lane's mapping. Recorded from Q-13 (INVITED_CLUBS) and Q-09 (DAVIDSON). |
+| D-47 | Guarded master merge | Promotion step 1 is a guarded merge into CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY, run by the owner after approval (script: "Claude outputs/MASTER_MERGE_D47.sql"). New keys are inserted. An existing key is updated only when REVIEWED_BY is null and the approved seed changed; the old row is archived to KSL_MASTER_ACCOUNT_HIERARCHY_HISTORY first. Rows a person reviewed are never changed, only listed. SPROC_RUN_PIPELINE stays insert-only. The build itself still never reads or writes the master. |
 
 ### Questions
 

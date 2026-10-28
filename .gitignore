@@ -10,3 +10,4 @@ __pycache__/
 Claude outputs/*
 !Claude outputs/SPROC_PROMOTE.sql
 !Claude outputs/SPROC_RUN_PIPELINE.sql
+!Claude outputs/MASTER_MERGE_D47.sql
