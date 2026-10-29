@@ -564,7 +564,7 @@ Appended in the order shown, after the common block.
 | The three income statement tables | `VALUE_SIGN NUMBER(2,0)`, `VALUE FLOAT` |
 | `SEM_AI_BALANCE_SHEET` | `VALUE_SIGN NUMBER(2,0)`, `VALUE FLOAT` — both null unless someone signs balance sheet accounts. Carried for shape consistency; do not read them as a measure. |
 | `SEM_AI_OPERATING_METRICS` | `METRIC_UNIT VARCHAR`, `AGGREGATION_TYPE VARCHAR` — and **no** `VALUE_SIGN` or `VALUE`. A count has no polarity. The measure is `STAT_VALUE` from the common block, except on a classifier override (§5), where an amount row lands here with `STAT_VALUE` null and its number in `SOURCE_AMOUNT`. |
-| `SEM_AI_UNKNOWN` | `UNKNOWN_REASON VARCHAR` — `UNCLASSIFIED_ACCOUNT`, `UNRESOLVED_CATEGORY` or `BOTH` — then `UNRESOLVED_CATEGORY_VALUE VARCHAR`, `METRIC_UNIT VARCHAR`, `AGGREGATION_TYPE VARCHAR`, all nullable. |
+| `SEM_AI_UNKNOWN` | `UNKNOWN_REASON VARCHAR` — `UNCLASSIFIED_ACCOUNT`, `SOURCE_ROLLUP`, `PLANNING_INPUT`, `DUPLICATE_DETAIL`, `UNRESOLVED_CATEGORY` or `BOTH` — then `UNRESOLVED_CATEGORY_VALUE VARCHAR`, `METRIC_UNIT VARCHAR`, `AGGREGATION_TYPE VARCHAR`, all nullable. |
 
 **`CATEGORY` and `H1`–`H5` are null only where they genuinely did not resolve.**
 In `SEM_AI_UNKNOWN` that means `CATEGORY` is null on an `UNRESOLVED_CATEGORY` or
@@ -581,6 +581,17 @@ Two independent causes. An unclassified account has a known category and no
 destination. An unresolved category has a good account and no table to land in.
 A row can have both. They are resolved by different people doing different
 things, which is why `UNKNOWN_REASON` separates them.
+
+**An unclassified account may carry a more specific reason**, where the owner
+approves one for the lane. Each replaces `UNCLASSIFIED_ACCOUNT` only (category
+resolved, `H1` unclassified); a row whose category also fails stays `BOTH`.
+
+- `SOURCE_ROLLUP`: the source's own total of other members, also marked
+  `IS_SUBTOTAL` (D-25).
+- `PLANNING_INPUT`: a planning or assumption member, such as an indicated
+  forecast or a saved assumption, not a booked amount.
+- `DUPLICATE_DETAIL`: a measured restatement of amounts already booked
+  elsewhere in the lane, kept so nothing is lost.
 
 **Within a build, this table is the measure of how much the source resisted
 classification.** It is not comparable across builds — each one is a different
@@ -1144,7 +1155,7 @@ Every one must return zero. **The object column matters:**
 | g | No row in `SEM_AI_INCOME_STATEMENT_<CAT>` whose `CATEGORY <> '<CAT>'` | `SEMANTIC` |
 | h | No row where `SOURCE_AMOUNT` and `VALUE_SIGN` are **both** non-null and `VALUE` is null or differs from the product beyond `0.005`; and none where `VALUE` is non-null while `VALUE_SIGN` is null | `SEMANTIC` |
 | i | No row with a null `SOURCE_TABLE` | `SEMANTIC` |
-| j | No row where `UNRESOLVED_CATEGORY_VALUE` is null while `UNKNOWN_REASON` is `UNRESOLVED_CATEGORY` or `BOTH`, or non-null otherwise | `SEM_AI_UNKNOWN` |
+| j | No row where `UNRESOLVED_CATEGORY_VALUE` is null while `UNKNOWN_REASON` is `UNRESOLVED_CATEGORY` or `BOTH`, or non-null otherwise; and none whose `UNKNOWN_REASON` is outside the six values in §4 (`SOURCE_ROLLUP`, `PLANNING_INPUT` and `DUPLICATE_DETAIL` are account reasons, so they count as "otherwise") | `SEM_AI_UNKNOWN` |
 | k | Of rows whose `H2` appears in the standard hierarchy, none whose `P_L_SECTION` or `NORMAL_BALANCE` disagrees with it; and of rows whose `H2` does not, none with either column non-null | `XREF_SNAPSHOT` and `SEMANTIC` |
 | l | No row whose `VALUE_SIGN` disagrees with its `NORMAL_BALANCE` | `XREF_SNAPSHOT` |
 

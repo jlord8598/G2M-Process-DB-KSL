@@ -22,6 +22,11 @@ $$
 -- built empty with RUN_ID, SOURCE_LANE, SOURCE_TABLE so the stream exists.
 -- SCENARIO is carried verbatim; category never replaces it (D-17).
 -- VALUE = SOURCE_AMOUNT * VALUE_SIGN. SOURCE_AMOUNT and STAT_VALUE unchanged.
+-- UNKNOWN_REASON (build 08 Q-06, CLAUDE.md section 4): an Unclassified account
+--   with a resolved category is SOURCE_ROLLUP (Ind-Total*, also IS_SUBTOTAL),
+--   PLANNING_INPUT (other Ind-*, META ACCOUNT_TYPE saved assumption),
+--   DUPLICATE_DETAIL (*_Wages_*_Dollars, 103.9% of A60351-A60355, Q-14), else
+--   UNCLASSIFIED_ACCOUNT. Category also unresolved stays BOTH.
 -- No filter, no aggregation. The scratch table is dropped before return.
 -- Built from the lane-independent text of SPROC_XFRM_PEREGRINE_RESORTS.
 -- ============================================================================
@@ -64,6 +69,7 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , meta_account_type
         from DEV_G2M_AI.STAGING.STG_INVITED_CLUBS_ESSBASE_EXTRACT
     )
     -- ------------------------------------------------------------------------
@@ -120,6 +126,14 @@ begin
         , cls.aggregation_type::varchar                        as aggregation_type
         , case
               when cls.h1 = 'Unclassified' and cat.category is null then 'BOTH'
+              when cls.h1 = 'Unclassified' and startswith(cat.account_key, 'Ind-Total')
+                                                                    then 'SOURCE_ROLLUP'
+              when cls.h1 = 'Unclassified' and startswith(cat.account_key, 'Ind-')
+                                                                    then 'PLANNING_INPUT'
+              when cls.h1 = 'Unclassified' and regexp_like(cat.account_key, '.*_Wages_.*_Dollars')
+                                                                    then 'DUPLICATE_DETAIL'
+              when cls.h1 = 'Unclassified' and lower(trim(cat.meta_account_type)) = 'saved assumption'
+                                                                    then 'PLANNING_INPUT'
               when cls.h1 = 'Unclassified'                          then 'UNCLASSIFIED_ACCOUNT'
               when cat.category is null                             then 'UNRESOLVED_CATEGORY'
           end::varchar                                         as unknown_reason

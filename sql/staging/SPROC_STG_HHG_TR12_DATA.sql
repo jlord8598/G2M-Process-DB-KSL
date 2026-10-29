@@ -18,8 +18,11 @@ $$
 -- 9 unmatched entities are a client item); ASSET_NAME_SOURCE names the source.
 -- Department 999 is STATISTIC (owner Q-01): its AMOUNT goes to STAT_VALUE
 -- and SOURCE_AMOUNT is null; on every other row AMOUNT is SOURCE_AMOUNT.
--- ACCOUNT_DESC from the lane's ACCOUNTS dictionary, null on every TR12
--- string at M1 (Q-02). No department dictionary: DEPARTMENT_NAME null.
+-- ACCOUNT_DESC, DEPARTMENT_NAME and PARENT_CODE from the lane's ACCOUNTS
+-- dictionary on FULL_ACCOUNT_STRING = ACCOUNT_CODE (unique on the whole table;
+-- build 08 M1): ACCOUNT_DESCRIPTION, DEPARTMENT_DESCRIPTION as supplied per
+-- account, no normalising (build 08 Q-09), PARENT_CODE an unused attribute
+-- (build 08 Q-11). Null where the source supplies none.
 -- ============================================================================
 declare
     v_rows integer;
@@ -53,6 +56,8 @@ begin
         select
               a.full_account_string
             , a.account_description
+            , a.department_description
+            , a.parent_code
         from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ACCOUNTS a
     )
     -- ------------------------------------------------------------------------
@@ -75,7 +80,7 @@ begin
                   then 'STG_HHG_REFERENCES.CLUB_NAME on entity = CLUB_NUMBER (build 06 Q-02)'
           end::varchar                                                          as asset_name_source
         , cln.c_dept::varchar                                                   as department
-        , null::varchar                                                         as department_name
+        , acct.department_description::varchar                                 as department_name
         , cln.account_code::varchar                                             as account_number
         , null::varchar                                                         as stat_account
         , cln.c_item::varchar                                                   as source_item_id
@@ -100,6 +105,7 @@ begin
         , (coalesce(cln.source_file_path, '~BLANK~')
             || '|' || coalesce(to_char(cln.source_row_number), '~BLANK~')
             || '|' || coalesce(to_char(cln.period_date, 'YYYY-MM-DD'), '~BLANK~'))::varchar as source_line_key
+        , acct.parent_code::varchar                                             as parent_code
         -- --------------------------------------------------------------------
         -- raw source columns, verbatim (SCENARIO above)
         -- --------------------------------------------------------------------

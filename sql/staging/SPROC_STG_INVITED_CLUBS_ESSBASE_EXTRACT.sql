@@ -19,7 +19,9 @@ $$
 -- does not list (owner Q-05).
 -- META_* are not unique on their member; each is reduced with MIN() per member
 -- before the join, so no join can add rows.
--- IS_SUBTOTAL: REPORT_LEVEL EBITDA_SUMMARY (owner Q-01). TotalDOMEnter stays
+-- IS_SUBTOTAL: REPORT_LEVEL EBITDA_SUMMARY (owner Q-01), or an ACCOUNT member
+-- named Ind-Total*, the source's rollup of its Ind- members (build 08 Q-06,
+-- D-25; matches their sum within 9.08 at M1). TotalDOMEnter stays
 -- false and is recorded as borderline in SUBTOTAL_SOURCE (owner Q-01).
 -- SCENARIO = VERSION_NAME; on the forecast branch FORECAST_VERSION is appended
 -- (Q-07). Site = ENTITY. Names from META ALIAS_DEFAULT (DESCRIPTION is empty).
@@ -103,10 +105,12 @@ begin
         , (cln.version_name || iff(cln.m_version is not null, ' | ' || cln.m_version, ''))::varchar as scenario
         , iff(cln.c_rtype = 'STATISTIC', null, cln.m_value)::float              as source_amount
         , iff(cln.c_rtype = 'STATISTIC', cln.m_value, null)::float              as stat_value
-        , (cln.report_level = 'EBITDA_SUMMARY')::boolean                        as is_subtotal
+        , (cln.report_level = 'EBITDA_SUMMARY' or startswith(cln.account, 'Ind-Total'))::boolean as is_subtotal
         , case
               when cln.report_level = 'EBITDA_SUMMARY'
                   then 'REPORT_LEVEL EBITDA_SUMMARY: computed Adjusted Cash EBITDA rollup, by structure (owner Q-01)'
+              when startswith(cln.account, 'Ind-Total')
+                  then 'ACCOUNT Ind-Total*: source rollup of the Ind- members, verified by sum at M1 (build 08 Q-06)'
               when cln.day_of_month = 'TotalDOMEnter'
                   then 'DAY_OF_MONTH TotalDOMEnter: borderline, equals Day01-31 in 76 pct of groups; not flagged (owner Q-01)'
               else 'REPORT_LEVEL DETAIL'

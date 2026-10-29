@@ -11,8 +11,14 @@ not evidence about this build's sources.**
 
 ## Source schema
 
-`CLN.<SOURCE>`: *(fill at M1)*. Load freeze window: *(fill at M1)*.
-Record every in-scope table's `last_altered` at M1 (`CLAUDE.md` D-43).
+`CLN.BOX_INVESTMENT_DATA` (*measured*). Load freeze window: 2026-10-28
+13:27:59.529 -0700 to 2026-10-30 13:27:59.529 -0700. That is 48 hours from
+this build's first query, `01c80a0b-010a-65ab-0003-4ff21c156b82`, as stated
+by the owner.
+
+Every in-scope table's `last_altered` is recorded in `findings/M1.md` section 3
+(`CLAUDE.md` D-43). The latest is 2026-10-19 15:41:03.950 PDT, before the
+freeze began.
 
 ## Lane declaration
 
@@ -20,7 +26,10 @@ Record every in-scope table's `last_altered` at M1 (`CLAUDE.md` D-43).
 
 | Lane | Source tables | Notes |
 |---|---|---|
-| *(fill at M1)* | | |
+| HHG (rebuilt, D-44) | CLN_HERITAGE_GOLF_ACCOUNTS, _CLUB_LIST, _FORECAST_ANAPLAN, _REFERENCES, _ROUNDS_DETAIL, _TR12_DATA | Re-granted. All six recreated 2026-10-27, before the freeze. The new descriptions are in ACCOUNTS (`findings/M1.md` section 9). |
+| INVITED_CLUBS (rebuilt, D-44) | CLN_INVITED_CLUBS_ACCOUNTS, _ESSBASE_EXTRACT, _META_ACCOUNT, _META_DEPARTMENT, _META_ENTITY, _META_LOCATION, _META_SUBACCOUNT | Scope: the A6 H2 mapping (D-46) and `UNKNOWN_REASON`. |
+| NEWBURY (rebuilt, D-44) | CLN_NEWBURY_BOSTON_ACCOUNTS, _OPERATING_STATS_BGT, _EVENTSANDOOO, _FCST, _PYACT, _SHOPS, _OTB_1DAY_PICKUP, _OTB_3DAY_PICKUP, _TRIAL_BALANCE | Scope: 11 accounts' H2 (D-46). |
+| *out of scope* | BEAUMIER (5), DAVIDSON (3), HERSHA (3) | Visible from earlier builds' grants; not this build's. |
 
 A lane is one coherent source set that gets its own staging models and one
 transformation procedure. Two tenants of one system are usually two lanes, not
@@ -34,7 +43,7 @@ confirms before any model is written.
 ```sql
 select table_schema, table_name, row_count, bytes, last_altered
 from CLN.INFORMATION_SCHEMA.TABLES
-where table_schema = 'CLEAN'
+where table_schema = 'BOX_INVESTMENT_DATA'
 order by table_name;
 ```
 
@@ -155,6 +164,97 @@ knows.
 
 **Anything surprising.** A constant column, a flag nobody mentioned, a label
 that contradicts its contents.
+
+---
+
+## Build 08 lanes (rebuild scope only)
+
+Everything not listed here is unchanged from the archived records: builds 02
+and 06 for HHG, build 03 for INVITED_CLUBS, builds 02 and 07 for NEWBURY.
+
+**HHG** (*measured*, `findings/M1.md` section 9).
+- **Description source:** `CLN_HERITAGE_GOLF_ACCOUNTS`, now with
+  `ACCOUNT_DESCRIPTION`, `DEPARTMENT_DESCRIPTION` and `PARENT_CODE` filled.
+- **Join:** `FULL_ACCOUNT_STRING` = TR12 `ACCOUNT_NUMBER`, where
+  `SOURCE_TABLE = 'CLN_HERITAGE_GOLF_TR12_DATA'`. Unique, one-to-one, 0
+  unmatched.
+- **Coverage:** 13,685 of 13,729 accounts, 164,232 of 164,760 fact rows.
+- **Entity names:** no table supplies names for 9050-9056, 9099 or 9102.
+- **Department 950** carries section-like descriptions (Q-09).
+
+**INVITED_CLUBS: chart structure** (*measured*; detail in `findings/M1.md`
+section 5).
+- Accounts are `A` + 5 digits, and character 2 is the section digit.
+- META `ACCOUNT_TYPE` states the statement.
+- The A6 range is 460 accounts and 113,857 keys, all META expense, all seeded
+  H1 `Expense`, H2 `UNCLASSIFIED` (build 03, Q-13).
+- They group into 3-digit blocks: 600-609, 611-633, 635, 636, 638.
+- META `PARENT` names a rollup group for each account (for example ACCTS-INTEX,
+  ACCTS-TAXEX, ACCTS-DEPAM). These parents are the second evidence source
+  for the mapping.
+
+**INVITED_CLUBS: H2 mapping** (D-46). *Approved at stop 1* (Q-03, Q-04,
+Q-05). It applies to the A6 accounts only; all other INVITED_CLUBS rules are
+unchanged from build 03.
+
+**Evidence.** Each block uses the 3-digit block (characters 2-4 of the
+A-code), the account description, and the account's META `ACCTS-*` parent.
+
+| Accounts | H1 / H2 | Evidence; examples |
+|---|---|---|
+| A600xx-A602xx | Expense / Cost of Goods Sold | "COGS:" descriptions; parents COGS1, COGSR, MGCG*. A60001 COGS: Food, A60103 COGS: Merchandise, A60201 COGS: General |
+| A603xx-A606xx | Expense / Payroll | parents HWAGE, SALRY, BONUS, PYTAX, BENEF, EMREL. A60301 Payroll: Gross Wages, A60501 Payroll Taxes, A60601 Education Reimbursement |
+| A607xx-A633xx and A638xx, and A63504 | Expense / Operating Expenses | operating parents. A60801 Advertising, A62601 Premium Expense, A62901 Electric, A63001 Property Taxes: Real, A63201 Facility Lease, A63804 Web Hosting, A63504 Intercompany Management Fees |
+| A635xx (except A63504), A62838 | Below the Line / Other Income / (Expense) | parents INTEX, INTFV. A63501 Interest Expense, A63551 Amortization of Debt Issuance Costs, A62838 Capitalized Interest |
+| A62824, A62839, A62849 | Below the Line / Other Income / (Expense) | parents SGA01, PMINI. Impairment of assets; Minority Interest Expense |
+| A636xx (except A63699) | Below the Line / Depreciation & Amortization | parents DEPAM, AMORT. A63601 Depreciation, A63602 Amortization |
+| A63004, A63009, A63010, A63014, A63015, A63019, A63020 | Below the Line / Income Taxes | parent TAXEX on all seven. A63009 Federal Income Tax |
+| A63699 Life / TAM Dues Clearing | Expense / UNCLASSIFIED | parent AMORT, but the description is not D&A. Listed for the business. |
+
+Where an account's block and its `ACCTS-*` parent disagree, the block applies
+(owner, Q-12). H3 stays `UNCLASSIFIED` throughout (D-11).
+
+**For the business to spot-check: 14 accounts where block and parent
+disagree, and A63699.**
+
+| Account | Block H2 (applied) | ACCTS parent | Parent's majority H2 |
+|---|---|---|---|
+| A60005 COGS: Other F&B | Cost of Goods Sold | ACCTS-FBSUP | Operating Expenses |
+| A60201 COGS: General | Cost of Goods Sold | ACCTS-MISCE | Operating Expenses |
+| A60202 COGS: Owners Distribution | Cost of Goods Sold | ACCTS-MISCE | Operating Expenses |
+| A60205 COGS: Guest Laundry | Cost of Goods Sold | ACCTS-MISCE | Operating Expenses |
+| A60206 COGS: Equipment | Cost of Goods Sold | ACCTS-MISCE | Operating Expenses |
+| A60207 COGS: MIS Intercompany | Cost of Goods Sold | ACCTS-MISCE | Operating Expenses |
+| A60208 COGS: MIS External | Cost of Goods Sold | ACCTS-MISCE | Operating Expenses |
+| A60211 COGS: Amenity Access/Membership Fee | Cost of Goods Sold | ACCTS-MISCE | Operating Expenses |
+| A60203 COGS: Property | Cost of Goods Sold | ACCTS-OOEXP | Operating Expenses |
+| A60517 TPA Dental | Payroll | ACCTS-OTINS | Operating Expenses |
+| A60518 COBRA Administration | Payroll | ACCTS-OTINS | Operating Expenses |
+| A60528 IBNR: Medical | Payroll | ACCTS-OTINS | Operating Expenses |
+| A62424 Drinks, Coffee, First Aid | Operating Expenses | ACCTS-EMREL | Payroll |
+| A62431 Selection Tools | Operating Expenses | ACCTS-EMREL | Payroll |
+| A63699 Life / TAM Dues Clearing | UNCLASSIFIED (owner Q-05) | ACCTS-AMORT | Depreciation & Amortization |
+
+**Q-04, recorded.** The standard hierarchy (`CLAUDE.md` section 5) is used as
+it is:
+- `Depreciation & Amortization` carries P_L_SECTION `Operating` and
+  NORMAL_BALANCE `Debit`, even where H1 is `Below the Line`. A consumer
+  computing operating profit from P_L_SECTION therefore includes D&A.
+- `Income Taxes` is `Non-Operating`, `Debit`.
+- `Other Income / (Expense)` is `Non-Operating`, `Mixed`, so unsigned.
+
+**NEWBURY: H2 mapping** (D-46). *Approved at stop 1* (Q-07). H1 stays
+`Below the Line`. Evidence: the 87/88/89 blocks of segment 2 and the account
+descriptions.
+- **Depreciation & Amortization:** 870105, 870110, 870120, 870125, 870205,
+  870210, 870215 (Depr Expense-...) and 880430 Amort Expense-Intangible Lease
+  Assets.
+- **Income Taxes:** 890010 Federal Income Tax.
+- **Unchanged, Other Income / (Expense):** 880420 Amort Expense-Loan Fees and
+  880440 Amort Expense-Interest Rate Cap (financing costs, Q-07), and the other
+  24 keys in the group.
+
+That makes 9 keys re-seeded, all at business unit 9000.
 
 ---
 

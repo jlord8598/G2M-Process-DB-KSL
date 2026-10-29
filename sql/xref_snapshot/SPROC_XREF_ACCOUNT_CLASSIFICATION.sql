@@ -20,7 +20,10 @@ $$
 --              H3/H4/H5 UNCLASSIFIED (the chart states no Level 2).
 --              P_L_SECTION, NORMAL_BALANCE from H2; VALUE_SIGN from
 --              NORMAL_BALANCE.
---   3 merge    insert-only; an existing key gets LAST_SEEN_RUN_ID only (D-14)
+--   3 merge    insert-only; an existing key gets LAST_SEEN_RUN_ID only (D-14).
+--              Changing a branch never reaches existing rows: build 08 re-seeded
+--              INVITED_CLUBS and NEWBURY once, by an approved D-44 UPDATE of the
+--              classification columns (scripts/reseed_build08.sql).
 -- One derivation branch per lane (DAVIDSON added in build 06). No exception
 -- is caught; an undeclared lane
 -- raises.
@@ -581,7 +584,10 @@ begin
         --   SUBACCOUNT label as stated, carried as STAT_UNIT_FAMILY (D-38).
         -- Money: section digit = first digit of the 6-digit account, segment
         --   2 of a well-formed 9999-999999-9999-999999-9999 key (char 6).
-        --   Digit rule only; D&A and income tax are not singled out (Q-14).
+        --   Digit rule, except the 9 BU 9000 below-the-line accounts the owner
+        --   named (build 08 Q-07): 870105 870110 870120 870125 870205 870210 870215
+        --   880430 -> H2 Depreciation & Amortization; 890010 -> Income Taxes. H1 stays
+        --   Below the Line (digit, D-46).
         -- BGT / PYACT carry no account: Unclassified (Q-19).
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
@@ -636,6 +642,7 @@ begin
                     , nullif(trim(ext.account_number), '')                                                              as c_acct
                     , regexp_like(nullif(trim(ext.account_number), ''), '[0-9]{4}-[0-9]{6}-[0-9]{4}-[0-9]{6}-[0-9]{4}') as acct_ok
                     , try_to_number(substr(nullif(trim(ext.account_number), ''), 6, 1))                                as digit
+                    , substr(nullif(trim(ext.account_number), ''), 6, 6)                                                as seg2
                 from ext
             )
             , cls as (
@@ -655,6 +662,9 @@ begin
                     , case
                           when k_rtype = 'STATISTIC'             then coalesce(nullif(trim(unit_family), ''), 'UNCLASSIFIED')
                           when c_acct is null or not acct_ok     then 'UNCLASSIFIED'
+                          when seg2 in ('870105', '870110', '870120', '870125', '870205', '870210', '870215', '880430')
+                                                                 then 'Depreciation & Amortization'
+                          when seg2 = '890010'                   then 'Income Taxes'
                           when digit = 1                         then 'Assets'
                           when digit = 2                         then 'Liabilities'
                           when digit = 3                         then 'Equity'
@@ -671,6 +681,8 @@ begin
                           when k_rtype = 'STATISTIC'             then 'RECORD_TYPE STATISTIC; no SUBACCOUNT label'
                           when c_acct is null                    then 'no ACCOUNT_NUMBER: nothing to derive (Q-19)'
                           when not acct_ok                       then 'ACCOUNT_NUMBER malformed: not repaired'
+                          when seg2 in ('870105', '870110', '870120', '870125', '870205', '870210', '870215', '880430', '890010')
+                              then 'section digit ' || digit || ' (H1); H2 by named account ' || seg2 || ' (owner, build 08 Q-07)'
                           when digit between 1 and 9             then 'section digit ' || digit || ' (char 6 of FULL_ACCOUNT_KEY)'
                           else 'section digit ' || coalesce(to_char(digit), 'none') || ': not in digit table'
                       end as seed_source
@@ -689,6 +701,8 @@ begin
                       when 'Payroll'                  then 'Operating'
                       when 'Operating Expenses'       then 'Operating'
                       when 'Other Income / (Expense)' then 'Non-Operating'
+                      when 'Depreciation & Amortization' then 'Operating'
+                      when 'Income Taxes'             then 'Non-Operating'
                   end as p_l_section
                 , case h2
                       when 'Revenue'                  then 'Credit'
@@ -696,12 +710,16 @@ begin
                       when 'Payroll'                  then 'Debit'
                       when 'Operating Expenses'       then 'Debit'
                       when 'Other Income / (Expense)' then 'Mixed'
+                      when 'Depreciation & Amortization' then 'Debit'
+                      when 'Income Taxes'             then 'Debit'
                   end as normal_balance
                 , case h2
                       when 'Revenue'                  then 1
                       when 'Cost of Goods Sold'       then -1
                       when 'Payroll'                  then -1
                       when 'Operating Expenses'       then -1
+                      when 'Depreciation & Amortization' then -1
+                      when 'Income Taxes'             then -1
                   end::number(2,0) as value_sign
                 , null::varchar as metric_unit
                 , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
@@ -883,8 +901,14 @@ begin
         --   non-currency): H1 Statistic first; H2 = the account member name (D-38).
         --   asset / liability / equity -> Balance Sheet; revenue -> Revenue; expense
         --   -> the A-code digit (A + 5 digits, char 2: 5 COGS, 7 Operating Expenses,
-        --   8 Below the Line; 6 is not Payroll: H1 Expense, H2 UNCLASSIFIED, owner
-        --   Q-13); expense without a digit, saved assumption
+        --   8 Below the Line); 6 -> the A6 block mapping (build 08 Q-03/Q-05, table in
+        --   docs/sources.md): 600-602 COGS, 603-606 Payroll, 607-633 and 638 Operating
+        --   Expenses, 635 Other Income / (Expense), 636 D&A, 63004 63009 63010 63014
+        --   63015 63019 63020 Income Taxes, 62824 62838 62839 62849 Other Income /
+        --   (Expense), 63504 Operating Expenses, 63699 and anything else UNCLASSIFIED;
+        --   OI/E, D&A and Income Taxes take H1 Below the Line, the rest H1 Expense.
+        --   Block applies where it and the ACCTS parent disagree (Q-12). Expense
+        --   without a digit, saved assumption
         --   (currency) and accounts not in META -> Unclassified.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
@@ -930,15 +954,38 @@ begin
                     , try_to_number(substr(nullif(trim(ext.account_number), ''), 2, 1))      as digit
                 from ext
             )
-            , cls as (
+            , prop6 as (
                 select
                       prop.*
+                    , case
+                          when not (c_type = 'expense' and acct_ok and digit = 6) then null
+                          when substr(trim(account_number), 2, 5) in ('63004', '63009', '63010', '63014', '63015', '63019', '63020')
+                                                                                   then 'Income Taxes'
+                          when substr(trim(account_number), 2, 5) in ('62824', '62838', '62839', '62849')
+                                                                                   then 'Other Income / (Expense)'
+                          when substr(trim(account_number), 2, 5) = '63504'       then 'Operating Expenses'
+                          when substr(trim(account_number), 2, 5) = '63699'       then 'UNCLASSIFIED'
+                          when substr(trim(account_number), 2, 3) in ('600', '601', '602')        then 'Cost of Goods Sold'
+                          when substr(trim(account_number), 2, 3) in ('603', '604', '605', '606') then 'Payroll'
+                          when substr(trim(account_number), 2, 3) between '607' and '633'
+                            or substr(trim(account_number), 2, 3) = '638'         then 'Operating Expenses'
+                          when substr(trim(account_number), 2, 3) = '635'         then 'Other Income / (Expense)'
+                          when substr(trim(account_number), 2, 3) = '636'         then 'Depreciation & Amortization'
+                          else 'UNCLASSIFIED'
+                      end as h2_6
+                from prop
+            )
+            , cls as (
+                select
+                      prop6.*
                     , case
                           when k_rtype = 'STATISTIC'            then 'Statistic'
                           when c_type = 'asset'                 then 'Balance Sheet'
                           when c_type = 'liability'             then 'Balance Sheet'
                           when c_type = 'equity'                then 'Balance Sheet'
                           when c_type = 'revenue'               then 'Revenue'
+                          when h2_6 in ('Other Income / (Expense)', 'Depreciation & Amortization', 'Income Taxes')
+                                                                                     then 'Below the Line'
                           when c_type = 'expense' and acct_ok and digit in (5, 6, 7) then 'Expense'
                           when c_type = 'expense' and acct_ok and digit = 8          then 'Below the Line'
                           else 'Unclassified'
@@ -950,7 +997,7 @@ begin
                           when c_type = 'equity'                 then 'Equity'
                           when c_type = 'revenue'                then 'Revenue'
                           when c_type = 'expense' and acct_ok and digit = 5 then 'Cost of Goods Sold'
-                          when c_type = 'expense' and acct_ok and digit = 6 then 'UNCLASSIFIED'
+                          when c_type = 'expense' and acct_ok and digit = 6 then h2_6
                           when c_type = 'expense' and acct_ok and digit = 7 then 'Operating Expenses'
                           when c_type = 'expense' and acct_ok and digit = 8 then 'Other Income / (Expense)'
                           else 'UNCLASSIFIED'
@@ -961,13 +1008,13 @@ begin
                           when c_type in ('asset', 'liability', 'equity', 'revenue')
                               then 'META_ACCOUNT.ACCOUNT_TYPE ' || c_type || ' (stated; owner Q-05)'
                           when c_type = 'expense' and acct_ok and digit = 6
-                              then 'META ACCOUNT_TYPE expense; A6 range is not Payroll: H2 UNCLASSIFIED (owner Q-13)'
+                              then 'META ACCOUNT_TYPE expense; A6 block ' || substr(trim(account_number), 2, 3) || ' mapping (owner, build 08 Q-03/Q-05)'
                           when c_type = 'expense' and acct_ok and digit between 5 and 8
                               then 'META ACCOUNT_TYPE expense; section digit ' || digit || ' (char 2 of A-code; owner Q-05)'
                           when c_type = 'expense'                then 'META ACCOUNT_TYPE expense, no usable A-code digit: Unclassified (owner Q-05)'
                           else 'META ACCOUNT_TYPE ' || c_type || ': no standard section (owner Q-05)'
                       end as seed_source
-                from prop
+                from prop6
             )
             select
                   k_lane, k_site, k_dept, k_acct, k_rtype
@@ -982,6 +1029,8 @@ begin
                       when 'Payroll'                  then 'Operating'
                       when 'Operating Expenses'       then 'Operating'
                       when 'Other Income / (Expense)' then 'Non-Operating'
+                      when 'Depreciation & Amortization' then 'Operating'
+                      when 'Income Taxes'             then 'Non-Operating'
                   end as p_l_section
                 , case h2
                       when 'Revenue'                  then 'Credit'
@@ -989,12 +1038,16 @@ begin
                       when 'Payroll'                  then 'Debit'
                       when 'Operating Expenses'       then 'Debit'
                       when 'Other Income / (Expense)' then 'Mixed'
+                      when 'Depreciation & Amortization' then 'Debit'
+                      when 'Income Taxes'             then 'Debit'
                   end as normal_balance
                 , case h2
                       when 'Revenue'                  then 1
                       when 'Cost of Goods Sold'       then -1
                       when 'Payroll'                  then -1
                       when 'Operating Expenses'       then -1
+                      when 'Depreciation & Amortization' then -1
+                      when 'Income Taxes'             then -1
                   end::number(2,0) as value_sign
                 , null::varchar as metric_unit
                 , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
