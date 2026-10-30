@@ -1,7 +1,7 @@
 -- ============================================================================
 -- D-47 guarded merge into CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY
 -- Promotion step 1 (replaces the insert-only statement). Run as G2M_SYSADMIN,
--- after the build is approved. Edit ONE thing: the lane list in step 1.
+-- after the build is approved. Edit ONE thing: MERGE_LANES at the top.
 --   new key                                  -> INSERT
 --   existing key, never reviewed (REVIEWED_BY is null), seed changed -> UPDATE
 --   existing key a person reviewed           -> never touched (listed in step 2)
@@ -9,6 +9,12 @@
 -- Every UPDATE is archived to ..._HISTORY first.
 -- SPROC_RUN_PIPELINE stays insert-only; only this script updates.
 -- ============================================================================
+
+-- session context: the temporary MERGE_PLAN table below needs a current schema
+use schema CLN.XREF;
+
+-- THE ONLY LINE TO EDIT: this build's lanes, comma-separated, no spaces
+set MERGE_LANES = 'HHG,INVITED_CLUBS,NEWBURY';
 
 -- 0. once only: history table (same columns as the master + archive stamp)
 create table if not exists CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY_HISTORY as
@@ -26,7 +32,7 @@ left join CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY m
   on  m.SOURCE_LANE = s.SOURCE_LANE and m.SOURCE_SITE_CODE = s.SOURCE_SITE_CODE
   and m.DEPARTMENT = s.DEPARTMENT and m.ACCOUNT_KEY = s.ACCOUNT_KEY
   and m.RECORD_TYPE = s.RECORD_TYPE
-where s.SOURCE_LANE in ('INVITED_CLUBS')                 -- <== this build's lanes
+where array_contains(s.SOURCE_LANE::variant, split($MERGE_LANES, ','))   -- lanes set at the top
   and ( m.SOURCE_LANE is null
      or ( m.REVIEWED_BY is null
           and not ( equal_null(m.H1, s.H1) and equal_null(m.H2, s.H2) and equal_null(m.H3, s.H3)
