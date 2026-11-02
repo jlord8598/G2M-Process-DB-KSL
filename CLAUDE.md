@@ -152,7 +152,9 @@ starts, move into `docs/completed-builds/<build-name>/`:
 every build, and parity checks all of it. **What else stays** is what no build
 changes: `scripts/parity_check.py`, `scripts/check_line_endings.py`,
 `scripts/probes/SPROC_PROBE_FAULT.sql` (the parity self-test's probe, never
-deployed), `.gitattributes`, and these documents. Each build writes its own
+deployed), `.gitattributes`, these documents, and `docs/open-items.md` (items
+raised by a build for the source owner or a later build; a build adds to it and
+never archives it). Each build writes its own
 lanes' MAINs and models and its own `run_build.sql`, and adds its branches to
 the seeder and its blocks to the six semantic models.
 
