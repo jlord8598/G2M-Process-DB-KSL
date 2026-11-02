@@ -137,8 +137,9 @@ Ask first:
   review report depends on it being stable within a build. A D-44 re-seed is
   allowed without a further prompt only for a lane the owner declared rebuilt
   AND whose changed H2 mapping the owner approved at stop 1 or stop 3; that
-  approval covers running it. Anything else touching those rows still asks
-  first.
+  approval covers running it. The re-seed sets only the columns D-44 lists
+  (H1-H5, section, balance, sign, `METRIC_UNIT`, `AGGREGATION_TYPE`, seed
+  source). Anything else touching those rows still asks first.
 - `git` operations beyond reading status and diffs
 
 Never:

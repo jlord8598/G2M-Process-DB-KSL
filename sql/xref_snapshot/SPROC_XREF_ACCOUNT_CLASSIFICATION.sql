@@ -910,6 +910,21 @@ begin
         --   Block applies where it and the ACCTS parent disagree (Q-12). Expense
         --   without a digit, saved assumption
         --   (currency) and accounts not in META -> Unclassified.
+        -- Build 09 rules (owner; docs/findings/M1.md, M4.md), applied after
+        --   STATISTIC and in this order (r_class):
+        --   IND      member name starts Ind (Ind-*, IndT*; primary META instance)
+        --            -> Unclassified (Q-02, Q-07 / B09-D1)
+        --   ACE      Adjusted Cash EBITDA (dynamic calc) -> Unclassified (Q-04)
+        --   PLAN     site (ENTITY) starts 'Plan ' -> Unclassified, GL included (Q-05, Q-10)
+        --   DUES     META expense dues roll-forward (MPLost, RMBase, XferOutBase,
+        --            DMBase, PALost, XLSLost, LULost, PRMB*, PDMB*, AALost) -> H1
+        --            Statistic, H2 member name (Q-06 / B09-D3)
+        --   KPI      META revenue, not an A-code -> H1 Statistic, H2 member name (B09-D4)
+        --   A5REV    META revenue A-code outside A4 -> Below the Line / Other Income /
+        --            (Expense), Mixed, unsigned (Q-16)
+        --   DUES/KPI rows keep RECORD_TYPE AMOUNT; METRIC_UNIT currency (META
+        --   DATA_TYPE); AGGREGATION_TYPE STOCK for BegBase_* / EndBase_* (owner
+        --   override, Q-13), else FLOW where META TIME_BALANCE is flow.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -944,6 +959,16 @@ begin
                 group by 1, 2, 3, 4, 5
             )
             -- ----------------------------------------------------------------
+            -- META TIME_BALANCE, primary instance (not shared), one row per member
+            -- ----------------------------------------------------------------
+            , mtb as (
+                select account, min(time_balance) as m_time_balance
+                from DEV_G2M_AI.STAGING.STG_INVITED_CLUBS_META_ACCOUNT
+                where 1=1
+                  and lower(trim(data_storage)) <> 'shared'
+                group by account
+            )
+            -- ----------------------------------------------------------------
             -- propose H1 / H2
             -- ----------------------------------------------------------------
             , prop as (
@@ -952,7 +977,22 @@ begin
                     , lower(trim(ext.m_type))                                                as c_type
                     , regexp_like(nullif(trim(ext.account_number), ''), 'A[0-9]{5}')         as acct_ok
                     , try_to_number(substr(nullif(trim(ext.account_number), ''), 2, 1))      as digit
+                    , lower(trim(mtb.m_time_balance))                                        as c_tb
+                    , case
+                          when ext.k_rtype = 'STATISTIC'                                     then null
+                          when startswith(ext.k_acct, 'Ind')                                 then 'IND'
+                          when ext.k_acct = 'Adjusted Cash EBITDA'                           then 'ACE'
+                          when startswith(ext.k_site, 'Plan ')                               then 'PLAN'
+                          when lower(trim(ext.m_type)) = 'expense'
+                           and regexp_like(ext.k_acct, '(MPLost|RMBase|XferOutBase|DMBase|PALost|XLSLost|LULost|PRMB|PDMB|AALost).*')
+                                                                                             then 'DUES'
+                          when lower(trim(ext.m_type)) = 'revenue'
+                           and not regexp_like(nullif(trim(ext.account_number), ''), 'A[0-9]{5}') then 'KPI'
+                          when lower(trim(ext.m_type)) = 'revenue'
+                           and try_to_number(substr(trim(ext.account_number), 2, 1)) <> 4    then 'A5REV'
+                      end                                                                    as r_class
                 from ext
+                left join mtb on mtb.account = ext.k_acct
             )
             , prop6 as (
                 select
@@ -980,6 +1020,9 @@ begin
                       prop6.*
                     , case
                           when k_rtype = 'STATISTIC'            then 'Statistic'
+                          when r_class in ('IND', 'ACE', 'PLAN') then 'Unclassified'
+                          when r_class in ('DUES', 'KPI')       then 'Statistic'
+                          when r_class = 'A5REV'                then 'Below the Line'
                           when c_type = 'asset'                 then 'Balance Sheet'
                           when c_type = 'liability'             then 'Balance Sheet'
                           when c_type = 'equity'                then 'Balance Sheet'
@@ -992,6 +1035,9 @@ begin
                       end as h1
                     , case
                           when k_rtype = 'STATISTIC'             then k_acct
+                          when r_class in ('IND', 'ACE', 'PLAN')  then 'UNCLASSIFIED'
+                          when r_class in ('DUES', 'KPI')        then k_acct
+                          when r_class = 'A5REV'                 then 'Other Income / (Expense)'
                           when c_type = 'asset'                  then 'Assets'
                           when c_type = 'liability'              then 'Liabilities'
                           when c_type = 'equity'                 then 'Equity'
@@ -1004,6 +1050,14 @@ begin
                       end as h2
                     , case
                           when k_rtype = 'STATISTIC'             then 'RECORD_TYPE STATISTIC (META DATA_TYPE non-currency); H2 = account member name'
+                          when r_class = 'IND'                   then 'member name starts Ind (Indicated/planning or Ind-Total rollup): Unclassified (build 09 Q-02, Q-07)'
+                          when r_class = 'ACE'                   then 'Adjusted Cash EBITDA, dynamic calc rollup: Unclassified (build 09 Q-04)'
+                          when r_class = 'PLAN'                  then 'Plan entity ' || k_site || ': planning input, Unclassified (build 09 Q-05, Q-10)'
+                          when r_class = 'DUES'                  then 'dues roll-forward, META expense currency: H1 Statistic, RECORD_TYPE AMOUNT kept (build 09 Q-06)'
+                          when r_class = 'KPI' and regexp_like(k_acct, '(BegBase|EndBase)_.*')
+                              then 'META revenue, not A4 GL: H1 Statistic (B09-D4); AGGREGATION_TYPE STOCK, owner override of META TIME_BALANCE (Q-13)'
+                          when r_class = 'KPI'                   then 'META revenue, not A4 GL: H1 Statistic, RECORD_TYPE AMOUNT kept (B09-D4)'
+                          when r_class = 'A5REV'                 then 'META revenue A-code outside A4: Other Income / (Expense) (build 09 Q-16)'
                           when c_type is null                    then 'account not in META_ACCOUNT: nothing to derive (owner Q-05)'
                           when c_type in ('asset', 'liability', 'equity', 'revenue')
                               then 'META_ACCOUNT.ACCOUNT_TYPE ' || c_type || ' (stated; owner Q-05)'
@@ -1049,8 +1103,12 @@ begin
                       when 'Depreciation & Amortization' then -1
                       when 'Income Taxes'             then -1
                   end::number(2,0) as value_sign
-                , null::varchar as metric_unit
-                , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
+                , case when r_class in ('DUES', 'KPI') then 'currency' end::varchar as metric_unit
+                , case
+                      when r_class in ('DUES', 'KPI') and regexp_like(k_acct, '(BegBase|EndBase)_.*') then 'STOCK'
+                      when r_class in ('DUES', 'KPI') and c_tb = 'flow'          then 'FLOW'
+                      when h1 = 'Statistic'                                      then 'UNRATIFIED'
+                  end as aggregation_type
                 , seed_source
             from cls
         ) src

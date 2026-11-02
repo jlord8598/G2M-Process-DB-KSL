@@ -14,15 +14,11 @@
 use schema CLN.XREF;
 
 -- THE ONLY LINE TO EDIT: this build's lanes, comma-separated, no spaces
-set MERGE_LANES = 'HHG,INVITED_CLUBS,NEWBURY';
+set MERGE_LANES = 'INVITED_CLUBS';
 
--- 0. once only: history table (same columns as the master + archive stamp)
-create table if not exists CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY_HISTORY as
-select m.*, current_timestamp()::timestamp_ltz as ARCHIVED_AT, ''::varchar as ARCHIVE_REASON
-from CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY m
-where false;
+-- (history table CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY_HISTORY already exists; created in build 08)
 
--- 1. plan: what this build would insert or update (EDIT THE LANE LIST)
+-- 1. plan: what this build would insert or update
 create or replace temporary table MERGE_PLAN as
 select s.*
      , iff(m.SOURCE_LANE is null, 'INSERT', 'UPDATE') as ACTION

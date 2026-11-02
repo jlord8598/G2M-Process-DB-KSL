@@ -27,6 +27,9 @@ $$
 --   PLANNING_INPUT (other Ind-*, META ACCOUNT_TYPE saved assumption),
 --   DUPLICATE_DETAIL (*_Wages_*_Dollars, 103.9% of A60351-A60355, Q-14), else
 --   UNCLASSIFIED_ACCOUNT. Category also unresolved stays BOTH.
+-- Build 09: SOURCE_ROLLUP also for Ind-Adjusted Cash EBITDA, Ind-Club Operating
+--   Profit and Adjusted Cash EBITDA (Q-04); PLANNING_INPUT for every other Ind*
+--   member, IndT* included (Q-02), and for any row at a 'Plan ' entity (Q-05).
 -- No filter, no aggregation. The scratch table is dropped before return.
 -- Built from the lane-independent text of SPROC_XFRM_PEREGRINE_RESORTS.
 -- ============================================================================
@@ -126,9 +129,12 @@ begin
         , cls.aggregation_type::varchar                        as aggregation_type
         , case
               when cls.h1 = 'Unclassified' and cat.category is null then 'BOTH'
-              when cls.h1 = 'Unclassified' and startswith(cat.account_key, 'Ind-Total')
+              when cls.h1 = 'Unclassified' and (startswith(cat.account_key, 'Ind-Total')
+                                                or cat.account_key in ('Ind-Adjusted Cash EBITDA', 'Ind-Club Operating Profit', 'Adjusted Cash EBITDA'))
                                                                     then 'SOURCE_ROLLUP'
-              when cls.h1 = 'Unclassified' and startswith(cat.account_key, 'Ind-')
+              when cls.h1 = 'Unclassified' and startswith(cat.account_key, 'Ind')
+                                                                    then 'PLANNING_INPUT'
+              when cls.h1 = 'Unclassified' and startswith(cat.source_site_code, 'Plan ')
                                                                     then 'PLANNING_INPUT'
               when cls.h1 = 'Unclassified' and regexp_like(cat.account_key, '.*_Wages_.*_Dollars')
                                                                     then 'DUPLICATE_DETAIL'
