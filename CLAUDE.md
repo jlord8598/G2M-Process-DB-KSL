@@ -256,7 +256,8 @@ XFRM_{LANE}_BALANCE_SHEET        H1 = Balance Sheet
 XFRM_{LANE}_OPERATING_METRICS    H1 = Statistic
 XFRM_{LANE}_PACING               from the lane's pacing and pickup sources
 XFRM_{LANE}_UNKNOWN              H1 = Unclassified, or the category does not
-                                    resolve
+                                    resolve, or the row loses a source-precedence
+                                    rule listed in D-48 (DUPLICATE_DETAIL)
 ```
 
 **Four streams route on `H1`; pacing routes on its source.** A row from a
@@ -594,6 +595,13 @@ resolved, `H1` unclassified); a row whose category also fails stays `BOTH`.
   forecast or a saved assumption, not a booked amount.
 - `DUPLICATE_DETAIL`: a measured restatement of amounts already booked
   elsewhere in the lane, kept so nothing is lost.
+
+**One exception: a classified row under a source-precedence rule (D-48).**
+Where two source tables of a lane carry the same lines, and the owner has
+approved a precedence rule for that lane and it is listed in D-48, the losing
+rows go to `UNKNOWN` as `DUPLICATE_DETAIL` even though their account is
+classified. They keep `H1`-`H5` and `CATEGORY`. No other classified row may
+carry an `UNKNOWN_REASON`.
 
 **Within a build, this table is the measure of how much the source resisted
 classification.** It is not comparable across builds — each one is a different
@@ -1152,7 +1160,7 @@ Every one must return zero. **The object column matters:**
 | b | No null `H1`, no null key part | `XREF_SNAPSHOT` |
 | c | No staged row fails to find a classification | `STAGING` joined to `XREF_SNAPSHOT` |
 | d | No key carries more than one `METRIC_UNIT`, or more than one `AGGREGATION_TYPE` | `XREF_SNAPSHOT` |
-| e | No row in a stream whose `H1` does not route there | the four `H1`-routed `XFRM` streams; `PACING` is exempt, it routes on source |
+| e | No row in a stream whose `H1` does not route there; in `UNKNOWN`, the only rows with a routed `H1` are those of a D-48 rule, with `UNKNOWN_REASON = 'DUPLICATE_DETAIL'` | the four `H1`-routed `XFRM` streams; `PACING` is exempt, it routes on source |
 | f | No row with `H1 = 'Statistic'` and a non-null `VALUE_SIGN` | `XREF_SNAPSHOT` and `XFRM` |
 | g | No row in `SEM_AI_INCOME_STATEMENT_<CAT>` whose `CATEGORY <> '<CAT>'` | `SEMANTIC` |
 | h | No row where `SOURCE_AMOUNT` and `VALUE_SIGN` are **both** non-null and `VALUE` is null or differs from the product beyond `0.005`; and none where `VALUE` is non-null while `VALUE_SIGN` is null | `SEMANTIC` |
@@ -1160,6 +1168,7 @@ Every one must return zero. **The object column matters:**
 | j | No row where `UNRESOLVED_CATEGORY_VALUE` is null while `UNKNOWN_REASON` is `UNRESOLVED_CATEGORY` or `BOTH`, or non-null otherwise; and none whose `UNKNOWN_REASON` is outside the six values in §4 (`SOURCE_ROLLUP`, `PLANNING_INPUT` and `DUPLICATE_DETAIL` are account reasons, so they count as "otherwise") | `SEM_AI_UNKNOWN` |
 | k | Of rows whose `H2` appears in the standard hierarchy, none whose `P_L_SECTION` or `NORMAL_BALANCE` disagrees with it; and of rows whose `H2` does not, none with either column non-null | `XREF_SNAPSHOT` and `SEMANTIC` |
 | l | No row whose `VALUE_SIGN` disagrees with its `NORMAL_BALANCE` | `XREF_SNAPSHOT` |
+| m | For each D-48 rule, no entity / account / month / scenario cell counted in the income statement from both competing source tables | `SEMANTIC` (the three income statement tables) |
 
 **Label every assertion with the letter in this table and run it exactly as
 defined here.** Never renumber, merge or substitute one; an assertion with the
@@ -1536,6 +1545,7 @@ and then it changes here, for every build after.
 | D-45 | Scenario never null | Where the source names a scenario, SCENARIO is that name verbatim. Where it names none and the category comes from the source table or an unpivoted measure column, SCENARIO is that table name (no schema) or column name, verbatim. Applied to each lane at its next build or rebuild. |
 | D-46 | `H2` seeding | A section digit seeds `H1` only (1-3 Balance Sheet, 4 Revenue, 5-7 Expense, 8 Below the Line, 9 Allocations & Reserves); `H2` seeds `UNCLASSIFIED` unless the lane's mapping assigns it. `H2` comes from a per-lane mapping established at M1 from that lane's own evidence (account blocks, a source dictionary or class, or a hierarchy parent), recorded in `docs/sources.md` with examples and approved by the owner at stop 1 or stop 3 like any other mapping. M1 reports each lane's chart structure so the mapping is approved before M4. Never reuse another lane's mapping. Recorded from Q-13 (INVITED_CLUBS) and Q-09 (DAVIDSON). |
 | D-47 | Guarded master merge | Promotion step 1 is a guarded merge into CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY, run by the owner after approval (script: "Claude outputs/MASTER_MERGE_D47.sql"). New keys are inserted. An existing key is updated only when REVIEWED_BY is null and the approved seed changed; the old row is archived to KSL_MASTER_ACCOUNT_HIERARCHY_HISTORY first. Rows a person reviewed are never changed, only listed. SPROC_RUN_PIPELINE stays insert-only. The build itself still never reads or writes the master. |
+| D-48 | Source precedence | A classified row may go to `UNKNOWN` as `DUPLICATE_DETAIL` only under a source-precedence rule approved by the owner for that lane and listed here; it keeps its `H1`-`H5`. Asserted by check 2(e) and 2(m). **Rules:** HERSHA (build 10): for `ACTUAL`, `CLN_HERSHA_TB_ACTUAL` beats `CLN_HERSHA_GL_ACTUAL` at every hotel (`COMPANY_ID`) TB carries; for `FORECAST`, `CLN_HERSHA_GL_ACTUAL` beats `CLN_HERSHA_TB_ACTUAL`. |
 
 ### Questions
 

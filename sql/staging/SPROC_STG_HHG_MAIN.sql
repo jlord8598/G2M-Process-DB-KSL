@@ -9,7 +9,7 @@ $$
 -- Staging orchestrator for lane HHG. Builds nothing itself.
 -- Stamps its own RUN_ID and passes it to every model it calls.
 -- Calls no other MAIN. Catches no exception.
--- Dictionaries first: TR12 reads STG_HHG_REFERENCES (build 06 Q-02).
+-- Dictionaries first: TR12 reads STG_HHG_ASSET_CODES (build 10 Q-02).
 -- ============================================================================
 declare
     v_run_id varchar default 'RUN_' || to_char(current_timestamp(), 'YYYYMMDD_HH24MISS_FF3');
@@ -29,6 +29,22 @@ begin
     v_models := v_models + 1;
 
     call DEV_G2M_AI.STAGING.SPROC_STG_HHG_REFERENCES(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_HHG_ASSET_CODES(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_HHG_CHART_OF_ACCOUNTS(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_HHG_DEPARTMENT_KEY(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_HHG_TR12_ACCOUNTS(:v_run_id) into :v_r;
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 

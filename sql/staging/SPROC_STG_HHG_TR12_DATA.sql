@@ -13,9 +13,10 @@ $$
 -- verbatim; standard columns derived alongside (docs/sources.md).
 -- SCENARIO is carried once: the standard column is the raw value verbatim.
 -- ACCOUNT_CODE = entity(4)-department(3)-natural account(5).
--- Site = the entity segment as written. ASSET_NAME = STG_HHG_REFERENCES.CLUB_NAME
--- where the entity equals CLUB_NUMBER exactly, else null (build 06 Q-02; the
--- 9 unmatched entities are a client item); ASSET_NAME_SOURCE names the source.
+-- Site = the entity segment as written. ASSET_NAME = STG_HHG_ASSET_CODES.CLUB_NAME
+-- where the entity equals CLUB_NUMBER exactly, else null (build 10 Q-02; was
+-- REFERENCES, build 06 Q-02; 9055, 9056, 9099, 9102 are not in landed data);
+-- ASSET_NAME_SOURCE names the source.
 -- Department 999 is STATISTIC (owner Q-01): its AMOUNT goes to STAT_VALUE
 -- and SOURCE_AMOUNT is null; on every other row AMOUNT is SOURCE_AMOUNT.
 -- ACCOUNT_DESC, DEPARTMENT_NAME and PARENT_CODE from the lane's ACCOUNTS
@@ -61,13 +62,13 @@ begin
         from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ACCOUNTS a
     )
     -- ------------------------------------------------------------------------
-    -- club name by GL entity, unique on CLUB_NUMBER (build 06 M1)
+    -- club name by GL entity, unique on CLUB_NUMBER (build 10 M1)
     -- ------------------------------------------------------------------------
     , refs as (
         select
               r.club_number
             , r.club_name
-        from DEV_G2M_AI.STAGING.STG_HHG_REFERENCES r
+        from DEV_G2M_AI.STAGING.STG_HHG_ASSET_CODES r
     )
     select
           :P_RUN_ID::varchar                                                    as run_id
@@ -77,7 +78,7 @@ begin
         , refs.club_name::varchar                                               as asset_name
         , case
               when refs.club_name is not null
-                  then 'STG_HHG_REFERENCES.CLUB_NAME on entity = CLUB_NUMBER (build 06 Q-02)'
+                  then 'STG_HHG_ASSET_CODES.CLUB_NAME on entity = CLUB_NUMBER (build 10 Q-02)'
           end::varchar                                                          as asset_name_source
         , cln.c_dept::varchar                                                   as department
         , acct.department_description::varchar                                 as department_name

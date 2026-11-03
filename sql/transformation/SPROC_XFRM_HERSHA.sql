@@ -12,12 +12,17 @@ $$
 --   XFRM_HERSHA_BALANCE_SHEET      H1 Balance Sheet
 --   XFRM_HERSHA_OPERATING_METRICS  H1 Statistic
 --   XFRM_HERSHA_PACING             routed on source, own columns (D-24)
---   XFRM_HERSHA_UNKNOWN            H1 Unclassified, or category unresolved
+--   XFRM_HERSHA_UNKNOWN            H1 Unclassified, or category unresolved, or
+--                                 the losing row of the D-48 precedence rule
 -- Fact rows joined once to the classification on the five-part key,
 -- sentinel-coalesced identically to the seeder.
 -- Category (section 6), row by row, from the branch (MEASURE_COLUMN):
 --   ACTUAL -> ACTUAL, FORECAST -> FORECAST (owner Q-07); anything else
---   unresolved. Facts: GL_ACTUAL, GL_STAT.
+--   unresolved. Facts: GL_ACTUAL, GL_STAT, TB_ACTUAL (build 10).
+-- Source precedence (D-48, build 10 Q-05, Q-06, Q-10): ACTUAL rows of
+--   CLN_HERSHA_GL_ACTUAL at a hotel TB_ACTUAL carries, and every FORECAST row of
+--   CLN_HERSHA_TB_ACTUAL, go to UNKNOWN as DUPLICATE_DETAIL, H1-H5 kept. TB's
+--   hotels are its distinct SOURCE_SITE_CODE values. TB FLAG_COL_* stay in staging.
 -- Pacing: the lane has no pacing source (M1); XFRM_HERSHA_PACING is built
 -- empty with RUN_ID, SOURCE_LANE, SOURCE_TABLE so the stream exists.
 -- SCENARIO is carried verbatim; category never replaces it (D-17).
@@ -71,6 +76,19 @@ begin
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
         from DEV_G2M_AI.STAGING.STG_HERSHA_GL_STAT
+        union all
+        select source_lane, source_site_code, asset_name, department, department_name
+             , account_number, stat_account, account_key, record_type, record_type_source
+             , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
+             , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+        from DEV_G2M_AI.STAGING.STG_HERSHA_TB_ACTUAL
+    )
+    -- ------------------------------------------------------------------------
+    -- hotels TB_ACTUAL carries (D-48)
+    -- ------------------------------------------------------------------------
+    , tb_site as (
+        select distinct source_site_code as tb_site_code
+        from DEV_G2M_AI.STAGING.STG_HERSHA_TB_ACTUAL
     )
     -- ------------------------------------------------------------------------
     -- category, row by row
@@ -83,7 +101,14 @@ begin
                   when fact.measure_column = 'FORECAST' then 'FORECAST'
               end as category
             , coalesce(fact.measure_column, '~BLANK~') as category_input
+            , (    (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_GL_ACTUAL'
+                    and fact.measure_column = 'ACTUAL'
+                    and tb_site.tb_site_code is not null)
+                or (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_TB_ACTUAL'
+                    and fact.measure_column = 'FORECAST'))::boolean as d48_loses
         from fact
+        left join tb_site
+            on  tb_site.tb_site_code = fact.source_site_code
         where 1=1
     )
     -- ------------------------------------------------------------------------
@@ -124,6 +149,7 @@ begin
         , cls.metric_unit::varchar                             as metric_unit
         , cls.aggregation_type::varchar                        as aggregation_type
         , case
+              when cat.d48_loses                                    then 'DUPLICATE_DETAIL'
               when cls.h1 = 'Unclassified' and cat.category is null then 'BOTH'
               when cls.h1 = 'Unclassified'                          then 'UNCLASSIFIED_ACCOUNT'
               when cat.category is null                             then 'UNRESOLVED_CATEGORY'

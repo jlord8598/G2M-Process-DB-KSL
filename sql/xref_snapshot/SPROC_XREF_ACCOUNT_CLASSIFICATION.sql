@@ -376,6 +376,15 @@ begin
         --   well-formed 9999-999-99999 ACCOUNT_CODE (char 10).
         -- Anaplan: the LINE_ITEM name as the stated section, the map approved
         --   by the owner at stop 3 (Q-04). An unmapped item is Unclassified.
+        -- Build 10 (D-46, owner Q-03, Q-04, Q-09, stop 2 correction): TR12 money
+        --   H1/H2 from STG_HHG_CHART_OF_ACCOUNTS.ACCOUNT_TYPE on department +
+        --   natural account (segments 2, 3). Where the department is not listed,
+        --   the account's type if it has one type at every listed department;
+        --   mixed-type accounts (49950, 51990, 52100) and accounts with no COA
+        --   row keep the digit rule. Revenue -> Revenue (51050, 51060 -> COGS);
+        --   Cost of Sales -> COGS; Labor -> Payroll; Operating Expense -> Opex;
+        --   Other Income -> Below the Line / OI/E; Below EBITDA -> Below the Line,
+        --   H2 D&A (82000, 82100, 82200), Income Taxes (84000), else OI/E.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -458,6 +467,23 @@ begin
                     , ('Other Income', 'Below the Line', 'Other Income / (Expense)')
             )
             -- ----------------------------------------------------------------
+            -- chart of accounts: type per department + natural account, and the
+            -- type per natural account where it is single across departments
+            -- ----------------------------------------------------------------
+            , coa as (
+                select department_code as c_dept, natural_account as c_nat, min(account_type) as c_type
+                from DEV_G2M_AI.STAGING.STG_HHG_CHART_OF_ACCOUNTS
+                where 1=1
+                group by 1, 2
+            )
+            , coa_nat as (
+                select natural_account as c_nat, min(account_type) as c_type
+                from DEV_G2M_AI.STAGING.STG_HHG_CHART_OF_ACCOUNTS
+                where 1=1
+                group by 1
+                having count(distinct account_type) = 1
+            )
+            -- ----------------------------------------------------------------
             -- propose H1 / H2
             -- ----------------------------------------------------------------
             , prop as (
@@ -468,16 +494,45 @@ begin
                     , try_to_number(substr(nullif(trim(ext.account_number), ''), 10, 1))           as digit
                     , amap.h1                                                                       as a_h1
                     , amap.h2                                                                       as a_h2
+                    , split_part(nullif(trim(ext.account_number), ''), '-', 3)                      as nat
+                    , coalesce(coa.c_type, coa_nat.c_type)                                          as t_type
+                    , iff(coa.c_type is not null, 'department + natural account', 'natural account, single type') as t_how
                 from ext
                 left join amap
                     on  ext.src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
                     and amap.line_item = ext.k_acct
+                left join coa
+                    on  ext.src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA'
+                    and coa.c_dept = split_part(nullif(trim(ext.account_number), ''), '-', 2)
+                    and coa.c_nat  = split_part(nullif(trim(ext.account_number), ''), '-', 3)
+                left join coa_nat
+                    on  ext.src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA'
+                    and coa_nat.c_nat = split_part(nullif(trim(ext.account_number), ''), '-', 3)
             )
-            , cls as (
+            , prop2 as (
                 select
                       prop.*
                     , case
+                          when k_rtype = 'STATISTIC' or not acct_ok or t_type is null then null
+                          when t_type = 'Revenue' and nat in ('51050', '51060')        then 'Expense|Cost of Goods Sold'
+                          when t_type = 'Revenue'                                       then 'Revenue|Revenue'
+                          when t_type = 'Cost of Sales'                                 then 'Expense|Cost of Goods Sold'
+                          when t_type = 'Labor'                                         then 'Expense|Payroll'
+                          when t_type = 'Operating Expense'                             then 'Expense|Operating Expenses'
+                          when t_type = 'Other Income'                                  then 'Below the Line|Other Income / (Expense)'
+                          when t_type = 'Below EBITDA' and nat in ('82000', '82100', '82200')
+                                                                                        then 'Below the Line|Depreciation & Amortization'
+                          when t_type = 'Below EBITDA' and nat = '84000'               then 'Below the Line|Income Taxes'
+                          when t_type = 'Below EBITDA'                                  then 'Below the Line|Other Income / (Expense)'
+                      end as t_map
+                from prop
+            )
+            , cls as (
+                select
+                      prop2.*
+                    , case
                           when k_rtype = 'STATISTIC'            then 'Statistic'
+                          when t_map is not null                then split_part(t_map, '|', 1)
                           when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
                               then coalesce(a_h1, 'Unclassified')
                           when c_acct is null                   then 'Unclassified'
@@ -493,6 +548,7 @@ begin
                           when k_rtype = 'STATISTIC'
                                and src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL' then 'ROUNDS_COUNT'
                           when k_rtype = 'STATISTIC'             then 'STAT_9'
+                          when t_map is not null                 then split_part(t_map, '|', 2)
                           when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
                               then coalesce(a_h2, 'UNCLASSIFIED')
                           when c_acct is null or not acct_ok     then 'UNCLASSIFIED'
@@ -512,6 +568,10 @@ begin
                               then 'RECORD_TYPE STATISTIC; H2 = ROUNDS_COUNT, the source column name (Q-07)'
                           when k_rtype = 'STATISTIC'
                               then 'RECORD_TYPE STATISTIC (dept 999, owner Q-01); H2 = STAT_9, section code, no family stated'
+                          when t_map is not null and nat in ('51050', '51060') and t_type = 'Revenue'
+                              then 'COA ACCOUNT_TYPE Revenue overridden to COGS for ' || nat || ' (build 10 Q-03)'
+                          when t_map is not null
+                              then 'COA ACCOUNT_TYPE ' || t_type || ' by ' || t_how || ' (D-46, build 10 Q-03)'
                           when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN' and a_h1 is not null
                               then 'LINE_ITEM name as stated section (owner Q-04, stop 3)'
                           when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
@@ -521,7 +581,7 @@ begin
                           when digit between 1 and 9             then 'section digit ' || digit || ' (char 10 of ACCOUNT_CODE)'
                           else 'section digit ' || coalesce(to_char(digit), 'none') || ': not in digit table'
                       end as seed_source
-                from prop
+                from prop2
             )
             select
                   k_lane, k_site, k_dept, k_acct, k_rtype
@@ -536,6 +596,8 @@ begin
                       when 'Payroll'                  then 'Operating'
                       when 'Operating Expenses'       then 'Operating'
                       when 'Other Income / (Expense)' then 'Non-Operating'
+                      when 'Depreciation & Amortization' then 'Operating'
+                      when 'Income Taxes'             then 'Non-Operating'
                   end as p_l_section
                 , case h2
                       when 'Revenue'                  then 'Credit'
@@ -543,12 +605,16 @@ begin
                       when 'Payroll'                  then 'Debit'
                       when 'Operating Expenses'       then 'Debit'
                       when 'Other Income / (Expense)' then 'Mixed'
+                      when 'Depreciation & Amortization' then 'Debit'
+                      when 'Income Taxes'             then 'Debit'
                   end as normal_balance
                 , case h2
                       when 'Revenue'                  then 1
                       when 'Cost of Goods Sold'       then -1
                       when 'Payroll'                  then -1
                       when 'Operating Expenses'       then -1
+                      when 'Depreciation & Amortization' then -1
+                      when 'Income Taxes'             then -1
                   end::number(2,0) as value_sign
                 , null::varchar as metric_unit
                 , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
@@ -750,7 +816,8 @@ begin
     elseif (:P_LANE = 'HERSHA') then
         -- ====================================================================
         -- LANE HERSHA (build 03)
-        -- Facts: GL_ACTUAL, GL_STAT.
+        -- Facts: GL_ACTUAL, GL_STAT, and TB_ACTUAL (build 10 Q-05; its keys seed under
+        --   the same rules, no mapping change).
         -- STATISTIC (GL_CODE Stat; GL_STAT, owner Q-02): H1 Statistic first; H2 = the
         --   account code (999999, ST10x0), the source's own code (D-38).
         -- Money: section digit = first digit of a 6-digit ACCOUNT_CODE, the section 5
@@ -773,6 +840,11 @@ begin
                      , asset_name, department_name, account_number, stat_account, account_desc
                      , source_table
                 from DEV_G2M_AI.STAGING.STG_HERSHA_GL_STAT
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , source_table
+                from DEV_G2M_AI.STAGING.STG_HERSHA_TB_ACTUAL
             )
             -- ----------------------------------------------------------------
             -- extract: one row per five-part key, attributes by MIN()
