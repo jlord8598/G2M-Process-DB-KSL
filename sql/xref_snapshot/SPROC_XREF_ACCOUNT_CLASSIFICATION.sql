@@ -24,7 +24,8 @@ $$
 --              Changing a branch never reaches existing rows: build 08 re-seeded
 --              INVITED_CLUBS and NEWBURY once, by an approved D-44 UPDATE of the
 --              classification columns (scripts/reseed_build08.sql).
--- One derivation branch per lane (DAVIDSON added in build 06). No exception
+-- One derivation branch per lane (DAVIDSON added in build 06; ALTERRA,
+-- ATLANTIC_AVIATION and JW_VENICE in build 11). No exception
 -- is caught; an undeclared lane
 -- raises.
 -- ============================================================================
@@ -1485,6 +1486,501 @@ begin
                           else 'source table not in the lane: nothing to derive'
                       end as seed_source
                 from prop
+            )
+            select
+                  k_lane, k_site, k_dept, k_acct, k_rtype
+                , asset_name, department_name, account_number, stat_account, account_desc
+                , h1, h2
+                , 'UNCLASSIFIED' as h3
+                , 'UNCLASSIFIED' as h4
+                , 'UNCLASSIFIED' as h5
+                , case h2
+                      when 'Revenue'                  then 'Gross Profit'
+                      when 'Cost of Goods Sold'       then 'Gross Profit'
+                      when 'Payroll'                  then 'Operating'
+                      when 'Operating Expenses'       then 'Operating'
+                      when 'Other Income / (Expense)' then 'Non-Operating'
+                  end as p_l_section
+                , case h2
+                      when 'Revenue'                  then 'Credit'
+                      when 'Cost of Goods Sold'       then 'Debit'
+                      when 'Payroll'                  then 'Debit'
+                      when 'Operating Expenses'       then 'Debit'
+                      when 'Other Income / (Expense)' then 'Mixed'
+                  end as normal_balance
+                , case h2
+                      when 'Revenue'                  then 1
+                      when 'Cost of Goods Sold'       then -1
+                      when 'Payroll'                  then -1
+                      when 'Operating Expenses'       then -1
+                  end::number(2,0) as value_sign
+                , null::varchar as metric_unit
+                , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
+                , seed_source
+            from cls
+        ) src
+            on  tgt.source_lane      = src.k_lane
+            and tgt.source_site_code = src.k_site
+            and tgt.department       = src.k_dept
+            and tgt.account_key      = src.k_acct
+            and tgt.record_type      = src.k_rtype
+        when matched then update set
+              tgt.last_seen_run_id = :P_RUN_ID
+        when not matched then insert (
+              source_lane, source_site_code, department, account_key, record_type
+            , asset_name, department_name, account_number, stat_account, account_desc
+            , h1, h2, h3, h4, h5, p_l_section, normal_balance, value_sign
+            , metric_unit, aggregation_type, review_status, seed_source
+            , first_seen_run_id, last_seen_run_id
+        ) values (
+              src.k_lane, src.k_site, src.k_dept, src.k_acct, src.k_rtype
+            , src.asset_name, src.department_name, src.account_number, src.stat_account, src.account_desc
+            , src.h1, src.h2, src.h3, src.h4, src.h5, src.p_l_section, src.normal_balance, src.value_sign
+            , src.metric_unit, src.aggregation_type, 'UNREVIEWED', src.seed_source
+            , :P_RUN_ID, :P_RUN_ID
+        );
+
+    elseif (:P_LANE = 'ALTERRA') then
+        -- ====================================================================
+        -- LANE ALTERRA (build 11)
+        -- Facts: MONTHLY_FINANCIALS. No account: ACCOUNT_KEY = LINE_ITEM,
+        --   DEPARTMENT = SECTION (stated in words; ACCOUNTS states the same).
+        -- Order (owner, stop 1 and Q-15): a source subtotal / computed line is
+        --   Unclassified (XFRM gives SOURCE_ROLLUP); STATISTIC -> Statistic, H2
+        --   the section name; then the section: Revenue -> Revenue; Cost of
+        --   Sales -> Cost of Goods Sold; Operating Labor -> Payroll; Operating
+        --   Expenses, G&A, Expenses, Undistributed Expenses -> Operating
+        --   Expenses, except Undistributed "Other - Commercial Properties" and
+        --   "Other - Real Estate" -> Below the Line / Other Income / (Expense)
+        --   (Q-07). Ski Butlers segment sections and the null section by line
+        --   family (Q-08, Q-15 lone totals): Revenue..., Cost of Sales /
+        --   Expenses - Cost of Sales..., Operating Labor / Expenses - Payroll...,
+        --   Operating Expenses / Expenses - Departmental Direct... / Expenses -
+        --   Other G&A. Ski Butlers "Alterra Resorts" is classified by family
+        --   and loses to the resorts' lines in XFRM (D-48).
+        -- Q-17: Revenue - Home Owners is a contra line: H2 Revenue, NORMAL_BALANCE
+        --   Credit, VALUE_SIGN -1 so it reduces revenue (owner decision; the one
+        --   exception to D-13 in this lane).
+        -- ====================================================================
+        merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
+        using (
+            with
+            -- ----------------------------------------------------------------
+            -- fact staging rows (pacing and dictionaries never feed the seeder)
+            -- ----------------------------------------------------------------
+            fact as (
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , is_subtotal, subtotal_source
+                from DEV_G2M_AI.STAGING.STG_ALTERRA_MONTHLY_FINANCIALS
+            )
+            -- ----------------------------------------------------------------
+            -- extract: one row per five-part key, attributes by MIN()
+            -- ----------------------------------------------------------------
+            , ext as (
+                select
+                      coalesce(nullif(trim(source_lane), ''), '~BLANK~')      as k_lane
+                    , coalesce(nullif(trim(source_site_code), ''), '~BLANK~') as k_site
+                    , coalesce(nullif(trim(department), ''), '~BLANK~')       as k_dept
+                    , coalesce(nullif(trim(account_key), ''), '~BLANK~')      as k_acct
+                    , coalesce(nullif(trim(record_type), ''), '~BLANK~')      as k_rtype
+                    , min(asset_name)                                         as asset_name
+                    , min(department_name)                                    as department_name
+                    , min(account_number)                                     as account_number
+                    , min(stat_account)                                       as stat_account
+                    , min(account_desc)                                       as account_desc
+                    , boolor_agg(is_subtotal)                                 as m_subtotal
+                    , min(subtotal_source)                                    as m_subtotal_source
+                from fact
+                where 1=1
+                group by 1, 2, 3, 4, 5
+            )
+            -- ----------------------------------------------------------------
+            -- line family, for the Ski Butlers segments and the null section
+            -- ----------------------------------------------------------------
+            , prop as (
+                select
+                      ext.*
+                    , case
+                          when k_acct like 'Revenue%'                                                           then 'Revenue'
+                          when k_acct = 'Cost of Sales' or k_acct like 'Expenses - Cost of Sales%'             then 'Cost of Goods Sold'
+                          when k_acct = 'Operating Labor' or k_acct like 'Expenses - Payroll%'                 then 'Payroll'
+                          when k_acct = 'Operating Expenses' or k_acct like 'Expenses - Departmental Direct%'
+                            or k_acct = 'Expenses - Other G&A'                                                 then 'Operating Expenses'
+                      end as c_family
+                from ext
+            )
+            -- ----------------------------------------------------------------
+            -- propose H1 / H2
+            -- ----------------------------------------------------------------
+            , cls0 as (
+                select
+                      prop.*
+                    , case
+                          when m_subtotal                                           then 'UNCLASSIFIED'
+                          when k_rtype = 'STATISTIC'                                then k_dept
+                          when k_dept = 'Revenue'                                   then 'Revenue'
+                          when k_dept = 'Cost of Sales'                             then 'Cost of Goods Sold'
+                          when k_dept = 'Operating Labor'                           then 'Payroll'
+                          when k_dept = 'Undistributed Expenses'
+                           and k_acct in ('Other - Commercial Properties', 'Other - Real Estate') then 'Other Income / (Expense)'
+                          when k_dept in ('Operating Expenses', 'G&A', 'Expenses', 'Undistributed Expenses') then 'Operating Expenses'
+                          when k_dept in ('Alterra Resorts', 'Other Resorts', '~BLANK~')
+                           and c_family is not null                                 then c_family
+                          else 'UNCLASSIFIED'
+                      end as h2
+                from prop
+            )
+            , cls as (
+                select
+                      cls0.*
+                    , case
+                          when m_subtotal                        then 'Unclassified'
+                          when k_rtype = 'STATISTIC'             then 'Statistic'
+                          when h2 = 'Revenue'                    then 'Revenue'
+                          when h2 = 'Other Income / (Expense)'   then 'Below the Line'
+                          when h2 in ('Cost of Goods Sold', 'Payroll', 'Operating Expenses') then 'Expense'
+                          else 'Unclassified'
+                      end as h1
+                    , case
+                          when m_subtotal                        then 'source subtotal or computed line (' || m_subtotal_source || '): SOURCE_ROLLUP, not classified'
+                          when k_rtype = 'STATISTIC'             then 'RECORD_TYPE STATISTIC; H2 = the source SECTION (D-38)'
+                          when k_acct = 'Revenue - Home Owners' and h2 = 'Revenue' then 'SECTION Revenue; contra line, VALUE_SIGN -1 so it reduces revenue (owner Q-17)'
+                          when m_subtotal_source = 'lone total (Q-15)' then 'lone total (Q-15): line family ' || h2
+                          when k_dept in ('Alterra Resorts', 'Other Resorts', '~BLANK~') and h2 <> 'UNCLASSIFIED'
+                                                                 then 'SECTION ' || k_dept || ': line family ' || h2 || ' (owner Q-08)'
+                          when h2 = 'Other Income / (Expense)'   then 'SECTION Undistributed Expenses, ' || k_acct || ' (owner Q-07)'
+                          when h2 <> 'UNCLASSIFIED'              then 'SECTION ' || k_dept || ' (stated; owner, stop 1)'
+                          else 'SECTION ' || k_dept || ': nothing to derive'
+                      end as seed_source
+                from cls0
+            )
+            select
+                  k_lane, k_site, k_dept, k_acct, k_rtype
+                , asset_name, department_name, account_number, stat_account, account_desc
+                , h1, h2
+                , 'UNCLASSIFIED' as h3
+                , 'UNCLASSIFIED' as h4
+                , 'UNCLASSIFIED' as h5
+                , case h2
+                      when 'Revenue'                  then 'Gross Profit'
+                      when 'Cost of Goods Sold'       then 'Gross Profit'
+                      when 'Payroll'                  then 'Operating'
+                      when 'Operating Expenses'       then 'Operating'
+                      when 'Other Income / (Expense)' then 'Non-Operating'
+                  end as p_l_section
+                , case h2
+                      when 'Revenue'                  then 'Credit'
+                      when 'Cost of Goods Sold'       then 'Debit'
+                      when 'Payroll'                  then 'Debit'
+                      when 'Operating Expenses'       then 'Debit'
+                      when 'Other Income / (Expense)' then 'Mixed'
+                  end as normal_balance
+                , case
+                      when h2 = 'Revenue' and k_acct = 'Revenue - Home Owners' then -1
+                      when h2 = 'Revenue'                  then 1
+                      when h2 = 'Cost of Goods Sold'       then -1
+                      when h2 = 'Payroll'                  then -1
+                      when h2 = 'Operating Expenses'       then -1
+                  end::number(2,0) as value_sign
+                , null::varchar as metric_unit
+                , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
+                , seed_source
+            from cls
+        ) src
+            on  tgt.source_lane      = src.k_lane
+            and tgt.source_site_code = src.k_site
+            and tgt.department       = src.k_dept
+            and tgt.account_key      = src.k_acct
+            and tgt.record_type      = src.k_rtype
+        when matched then update set
+              tgt.last_seen_run_id = :P_RUN_ID
+        when not matched then insert (
+              source_lane, source_site_code, department, account_key, record_type
+            , asset_name, department_name, account_number, stat_account, account_desc
+            , h1, h2, h3, h4, h5, p_l_section, normal_balance, value_sign
+            , metric_unit, aggregation_type, review_status, seed_source
+            , first_seen_run_id, last_seen_run_id
+        ) values (
+              src.k_lane, src.k_site, src.k_dept, src.k_acct, src.k_rtype
+            , src.asset_name, src.department_name, src.account_number, src.stat_account, src.account_desc
+            , src.h1, src.h2, src.h3, src.h4, src.h5, src.p_l_section, src.normal_balance, src.value_sign
+            , src.metric_unit, src.aggregation_type, 'UNREVIEWED', src.seed_source
+            , :P_RUN_ID, :P_RUN_ID
+        );
+
+    elseif (:P_LANE = 'ATLANTIC_AVIATION') then
+        -- ====================================================================
+        -- LANE ATLANTIC_AVIATION (build 11)
+        -- Facts: OC_DATA. No account: ACCOUNT_KEY = LINE_ITEM. The 18 sites
+        --   carry no usable section, so each line is mapped by the section the
+        --   lane dictionary (STG_ATLANTIC_AVIATION_ACCOUNTS) states for it under
+        --   Total Company (owner, stop 1).
+        -- Order: source subtotal / computed / bridge line -> Unclassified (XFRM
+        --   gives SOURCE_ROLLUP); Fuel Margin -> Statistic, currency, FLOW (Q-13,
+        --   the B09-D4 pattern; RECORD_TYPE stays AMOUNT); STATISTIC -> Statistic,
+        --   H2 KPIs - JetA Only; Salaries and Benefits (FBO and Corp) -> Payroll
+        --   (Q-09); Corporate Other Income/Expense, the numbered GL lines and One
+        --   Time Adjustments -> Below the Line / Other Income / (Expense) (Q-10);
+        --   then the dictionary section: Revenue; Cost of Sales -> Cost of Goods
+        --   Sold; FBO / Corporate Operating Expenses -> Operating Expenses; Debt
+        --   Reporting, Debt Breakdown, Revolver, and Debt's Long-Term / Other
+        --   Debt -> Balance Sheet / Liabilities, Cash (Ending Balance) -> Assets.
+        -- ====================================================================
+        merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
+        using (
+            with
+            -- ----------------------------------------------------------------
+            -- fact staging rows (pacing and dictionaries never feed the seeder)
+            -- ----------------------------------------------------------------
+            fact as (
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , is_subtotal, subtotal_source
+                from DEV_G2M_AI.STAGING.STG_ATLANTIC_AVIATION_OC_DATA
+            )
+            -- ----------------------------------------------------------------
+            -- extract: one row per five-part key, attributes by MIN()
+            -- ----------------------------------------------------------------
+            , ext as (
+                select
+                      coalesce(nullif(trim(source_lane), ''), '~BLANK~')      as k_lane
+                    , coalesce(nullif(trim(source_site_code), ''), '~BLANK~') as k_site
+                    , coalesce(nullif(trim(department), ''), '~BLANK~')       as k_dept
+                    , coalesce(nullif(trim(account_key), ''), '~BLANK~')      as k_acct
+                    , coalesce(nullif(trim(record_type), ''), '~BLANK~')      as k_rtype
+                    , min(asset_name)                                         as asset_name
+                    , min(department_name)                                    as department_name
+                    , min(account_number)                                     as account_number
+                    , min(stat_account)                                       as stat_account
+                    , min(account_desc)                                       as account_desc
+                    , boolor_agg(is_subtotal)                                 as m_subtotal
+                    , min(subtotal_source)                                    as m_subtotal_source
+                from fact
+                where 1=1
+                group by 1, 2, 3, 4, 5
+            )
+            -- ----------------------------------------------------------------
+            -- the lane dictionary: the section stated for each line under Total
+            -- Company (one section per line, M1)
+            -- ----------------------------------------------------------------
+            , dict as (
+                select full_account_string as d_line, min(department_description) as d_section
+                from DEV_G2M_AI.STAGING.STG_ATLANTIC_AVIATION_ACCOUNTS
+                where 1=1
+                  and entity_code = 'Total Company'
+                group by 1
+            )
+            , prop as (
+                select ext.*, dict.d_section
+                from ext
+                left join dict
+                    on dict.d_line = ext.k_acct
+            )
+            -- ----------------------------------------------------------------
+            -- propose H1 / H2
+            -- ----------------------------------------------------------------
+            , cls0 as (
+                select
+                      prop.*
+                    , case
+                          when m_subtotal                                                       then 'UNCLASSIFIED'
+                          when k_acct = 'Fuel Margin'                                           then 'KPIs - JetA Only'
+                          when k_rtype = 'STATISTIC'                                            then 'KPIs - JetA Only'
+                          when k_acct in ('Salaries and Benefits', 'Salaries and Benefits - Corp') then 'Payroll'
+                          when k_acct = 'Corporate Other Income/Expense'
+                            or k_acct = 'One Time Adjustments'
+                            or regexp_like(k_acct, '^[0-9]{6} - .*')                            then 'Other Income / (Expense)'
+                          when d_section = 'Revenue'                                            then 'Revenue'
+                          when d_section = 'Cost of Sales'                                      then 'Cost of Goods Sold'
+                          when d_section in ('FBO Operating Expenses', 'Corporate Operating Expenses') then 'Operating Expenses'
+                          when k_acct = 'Cash (Ending Balance)'                                 then 'Assets'
+                          when d_section in ('Debt Reporting', 'Debt Breakdown', 'Revolver')
+                            or (d_section = 'Debt' and k_acct in ('Long-Term Debt', 'Other Debt')) then 'Liabilities'
+                          else 'UNCLASSIFIED'
+                      end as h2
+                from prop
+            )
+            , cls as (
+                select
+                      cls0.*
+                    , case
+                          when m_subtotal                                       then 'Unclassified'
+                          when h2 = 'KPIs - JetA Only'                          then 'Statistic'
+                          when h2 = 'Revenue'                                   then 'Revenue'
+                          when h2 = 'Other Income / (Expense)'                  then 'Below the Line'
+                          when h2 in ('Cost of Goods Sold', 'Payroll', 'Operating Expenses') then 'Expense'
+                          when h2 in ('Assets', 'Liabilities')                  then 'Balance Sheet'
+                          else 'Unclassified'
+                      end as h1
+                    , case
+                          when m_subtotal                       then 'source subtotal, computed or bridge line (' || m_subtotal_source || '): SOURCE_ROLLUP, not classified'
+                          when k_acct = 'Fuel Margin'           then 'Fuel Margin: operating metric, currency, FLOW; RECORD_TYPE AMOUNT kept (owner Q-13, B09-D4 pattern)'
+                          when k_rtype = 'STATISTIC'            then 'RECORD_TYPE STATISTIC; H2 = the source section KPIs - JetA Only (D-38)'
+                          when h2 = 'Payroll'                   then 'Salaries and Benefits: Payroll whatever the section (owner Q-09)'
+                          when h2 = 'Other Income / (Expense)'  then k_acct || ': Below the Line (owner Q-10)'
+                          when h2 <> 'UNCLASSIFIED'             then 'Total Company dictionary section ' || d_section || ' (owner, stop 1)'
+                          when d_section is null                then 'line not in the Total Company dictionary: nothing to derive'
+                          else 'dictionary section ' || d_section || ': nothing to derive'
+                      end as seed_source
+                from cls0
+            )
+            select
+                  k_lane, k_site, k_dept, k_acct, k_rtype
+                , asset_name, department_name, account_number, stat_account, account_desc
+                , h1, h2
+                , 'UNCLASSIFIED' as h3
+                , 'UNCLASSIFIED' as h4
+                , 'UNCLASSIFIED' as h5
+                , case h2
+                      when 'Revenue'                  then 'Gross Profit'
+                      when 'Cost of Goods Sold'       then 'Gross Profit'
+                      when 'Payroll'                  then 'Operating'
+                      when 'Operating Expenses'       then 'Operating'
+                      when 'Other Income / (Expense)' then 'Non-Operating'
+                  end as p_l_section
+                , case h2
+                      when 'Revenue'                  then 'Credit'
+                      when 'Cost of Goods Sold'       then 'Debit'
+                      when 'Payroll'                  then 'Debit'
+                      when 'Operating Expenses'       then 'Debit'
+                      when 'Other Income / (Expense)' then 'Mixed'
+                  end as normal_balance
+                , case h2
+                      when 'Revenue'                  then 1
+                      when 'Cost of Goods Sold'       then -1
+                      when 'Payroll'                  then -1
+                      when 'Operating Expenses'       then -1
+                  end::number(2,0) as value_sign
+                , case when k_acct = 'Fuel Margin' and h1 = 'Statistic' then 'currency' end::varchar as metric_unit
+                , case when k_acct = 'Fuel Margin' and h1 = 'Statistic' then 'FLOW' when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
+                , seed_source
+            from cls
+        ) src
+            on  tgt.source_lane      = src.k_lane
+            and tgt.source_site_code = src.k_site
+            and tgt.department       = src.k_dept
+            and tgt.account_key      = src.k_acct
+            and tgt.record_type      = src.k_rtype
+        when matched then update set
+              tgt.last_seen_run_id = :P_RUN_ID
+        when not matched then insert (
+              source_lane, source_site_code, department, account_key, record_type
+            , asset_name, department_name, account_number, stat_account, account_desc
+            , h1, h2, h3, h4, h5, p_l_section, normal_balance, value_sign
+            , metric_unit, aggregation_type, review_status, seed_source
+            , first_seen_run_id, last_seen_run_id
+        ) values (
+              src.k_lane, src.k_site, src.k_dept, src.k_acct, src.k_rtype
+            , src.asset_name, src.department_name, src.account_number, src.stat_account, src.account_desc
+            , src.h1, src.h2, src.h3, src.h4, src.h5, src.p_l_section, src.normal_balance, src.value_sign
+            , src.metric_unit, src.aggregation_type, 'UNREVIEWED', src.seed_source
+            , :P_RUN_ID, :P_RUN_ID
+        );
+
+    elseif (:P_LANE = 'JW_VENICE') then
+        -- ====================================================================
+        -- LANE JW_VENICE (build 11)
+        -- Facts: FCAST_ACT_FORECAST, FCAST_BY_PERIOD (DEPARTMENT = SECTION,
+        --   ACCOUNT_KEY = LINE_ITEM); FTE, HEADCOUNT (DEPARTMENT = DEPARTMENT_LABEL,
+        --   ACCOUNT_KEY = the table subject, Q-04).
+        -- Order (owner, stop 1): source subtotal / computed line -> Unclassified
+        --   (XFRM gives SOURCE_ROLLUP); STATISTIC -> Statistic, H2 = KEY
+        --   STATISTICS or the table subject (FTE, HEADCOUNT); CREDIT CARD EXPENSE
+        --   -> Operating Expenses; OPERATING REVENUE, SALES -> Revenue;
+        --   UNDISTRIBUTED OPERATING EXP -> Operating Expenses, except NON-OP
+        --   INC/EXP EXCL. OWNER EXP. and OWNER INTEREST & INCOME TAX (Q-11) ->
+        --   Below the Line / Other Income / (Expense); Isolated / One off costs
+        --   -> Below the Line / Other Income / (Expense).
+        -- ====================================================================
+        merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
+        using (
+            with
+            -- ----------------------------------------------------------------
+            -- fact staging rows (pacing and dictionaries never feed the seeder)
+            -- ----------------------------------------------------------------
+            fact as (
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , is_subtotal, subtotal_source
+                from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_ACT_FORECAST
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , is_subtotal, subtotal_source
+                from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_BY_PERIOD
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , is_subtotal, subtotal_source
+                from DEV_G2M_AI.STAGING.STG_JW_VENICE_FTE
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , is_subtotal, subtotal_source
+                from DEV_G2M_AI.STAGING.STG_JW_VENICE_HEADCOUNT
+            )
+            -- ----------------------------------------------------------------
+            -- extract: one row per five-part key, attributes by MIN()
+            -- ----------------------------------------------------------------
+            , ext as (
+                select
+                      coalesce(nullif(trim(source_lane), ''), '~BLANK~')      as k_lane
+                    , coalesce(nullif(trim(source_site_code), ''), '~BLANK~') as k_site
+                    , coalesce(nullif(trim(department), ''), '~BLANK~')       as k_dept
+                    , coalesce(nullif(trim(account_key), ''), '~BLANK~')      as k_acct
+                    , coalesce(nullif(trim(record_type), ''), '~BLANK~')      as k_rtype
+                    , min(asset_name)                                         as asset_name
+                    , min(department_name)                                    as department_name
+                    , min(account_number)                                     as account_number
+                    , min(stat_account)                                       as stat_account
+                    , min(account_desc)                                       as account_desc
+                    , boolor_agg(is_subtotal)                                 as m_subtotal
+                    , min(subtotal_source)                                    as m_subtotal_source
+                from fact
+                where 1=1
+                group by 1, 2, 3, 4, 5
+            )
+            -- ----------------------------------------------------------------
+            -- propose H1 / H2
+            -- ----------------------------------------------------------------
+            , cls0 as (
+                select
+                      ext.*
+                    , case
+                          when m_subtotal                                         then 'UNCLASSIFIED'
+                          when k_rtype = 'STATISTIC' and k_acct in ('FTE', 'HEADCOUNT') then k_acct
+                          when k_rtype = 'STATISTIC'                              then k_dept
+                          when k_dept = 'KEY STATISTICS' and k_acct = 'CREDIT CARD EXPENSE' then 'Operating Expenses'
+                          when k_dept in ('OPERATING REVENUE', 'SALES')           then 'Revenue'
+                          when k_dept = 'UNDISTRIBUTED OPERATING EXP'
+                           and k_acct in ('NON-OP INC/EXP EXCL. OWNER EXP.', 'OWNER INTEREST & INCOME TAX') then 'Other Income / (Expense)'
+                          when k_dept = 'UNDISTRIBUTED OPERATING EXP'             then 'Operating Expenses'
+                          when k_dept = 'Isolated / One off costs (to be input by Marriott)' then 'Other Income / (Expense)'
+                          else 'UNCLASSIFIED'
+                      end as h2
+                from ext
+            )
+            , cls as (
+                select
+                      cls0.*
+                    , case
+                          when m_subtotal                       then 'Unclassified'
+                          when k_rtype = 'STATISTIC'            then 'Statistic'
+                          when h2 = 'Revenue'                   then 'Revenue'
+                          when h2 = 'Other Income / (Expense)'  then 'Below the Line'
+                          when h2 = 'Operating Expenses'        then 'Expense'
+                          else 'Unclassified'
+                      end as h1
+                    , case
+                          when m_subtotal                       then 'source subtotal or computed line (' || m_subtotal_source || '): SOURCE_ROLLUP, not classified'
+                          when k_rtype = 'STATISTIC'            then 'RECORD_TYPE STATISTIC; H2 = ' || h2 || ', the source section or table subject (D-38, Q-04)'
+                          when k_acct = 'CREDIT CARD EXPENSE'   then 'KEY STATISTICS CREDIT CARD EXPENSE: money, Operating Expenses (owner, stop 1)'
+                          when h2 = 'Other Income / (Expense)' and k_dept = 'UNDISTRIBUTED OPERATING EXP' then k_acct || ': Below the Line (owner Q-11)'
+                          when h2 <> 'UNCLASSIFIED'             then 'SECTION ' || k_dept || ' (stated; owner, stop 1)'
+                          else 'SECTION ' || k_dept || ': nothing to derive'
+                      end as seed_source
+                from cls0
             )
             select
                   k_lane, k_site, k_dept, k_acct, k_rtype

@@ -179,8 +179,9 @@ master accumulates rows keyed by lane, so two companies both declaring a lane
 called `GL` collide there and neither can be separated afterwards. At M1, check
 the proposed names against `docs/completed-builds/` and against the
 `SOURCE_LANE` values already in `DEV_G2M_AI` (the classification table and the
-six semantic tables), and tell the owner what you found. **Checking the master is the owner's job**, not yours — the pipeline
-never reads it (§7, D-03). Do not build until the owner confirms the names are
+six semantic tables), and tell the owner what you found. **The build may read the master only to report the key-match rate and
+conflicts with reviewed rows** (D-03), so report whether it holds any of the
+proposed lanes; it never writes it, and the owner still confirms (§7). Do not build until the owner confirms the names are
 free.
 
 ---
@@ -1062,8 +1063,9 @@ too, made by the owner before the next promotion.
 
 **Promotion is manual and one-way.** The owner moves the code to its permanent
 home and inserts this build's classifications into the master. **The build
-environment never reads or writes that table.** `CLN.XREF` is otherwise out of
-scope entirely (D-03) — no legacy lookup in that schema is consulted.
+environment never writes that table, and reads it only to report the key-match
+rate and conflicts with reviewed rows** (D-03). Classification never derives
+from `CLN.XREF`; no legacy lookup in that schema is consulted.
 
 **What promotion moves, and how:**
 
@@ -1167,7 +1169,7 @@ Every one must return zero. **The object column matters:**
 | i | No row with a null `SOURCE_TABLE` | `SEMANTIC` |
 | j | No row where `UNRESOLVED_CATEGORY_VALUE` is null while `UNKNOWN_REASON` is `UNRESOLVED_CATEGORY` or `BOTH`, or non-null otherwise; and none whose `UNKNOWN_REASON` is outside the six values in §4 (`SOURCE_ROLLUP`, `PLANNING_INPUT` and `DUPLICATE_DETAIL` are account reasons, so they count as "otherwise") | `SEM_AI_UNKNOWN` |
 | k | Of rows whose `H2` appears in the standard hierarchy, none whose `P_L_SECTION` or `NORMAL_BALANCE` disagrees with it; and of rows whose `H2` does not, none with either column non-null | `XREF_SNAPSHOT` and `SEMANTIC` |
-| l | No row whose `VALUE_SIGN` disagrees with its `NORMAL_BALANCE` | `XREF_SNAPSHOT` |
+| l | No row whose `VALUE_SIGN` disagrees with its `NORMAL_BALANCE`, except a contra line listed in D-13, which carries the opposite sign | `XREF_SNAPSHOT` |
 | m | For each D-48 rule, no entity / account / month / scenario cell counted in the income statement from both competing source tables | `SEMANTIC` (the three income statement tables) |
 
 **Label every assertion with the letter in this table and run it exactly as
@@ -1348,7 +1350,7 @@ USE WAREHOUSE G2M_MCP_AGENT_WH;
 
 | | Where |
 |---|---|
-| **Source data** | `CLN.<SOURCE>`, this build's declared source schema, held under a load freeze (§2): the tables assigned to this build's declared lanes. **`CLN.XREF` is not read.** |
+| **Source data** | `CLN.<SOURCE>`, this build's declared source schema, held under a load freeze (§2): the tables assigned to this build's declared lanes. **Classification never derives from `CLN.XREF`**; the master is read only as D-03 allows. |
 | **Build target** | `DEV_G2M_AI` — schemas `STAGING`, `XREF_SNAPSHOT`, `TRANSFORMATION`, `SEMANTIC` |
 | **Metadata** | `DEV_G2M_AI.INFORMATION_SCHEMA`, `CLN.INFORMATION_SCHEMA`, `SNOWFLAKE.ACCOUNT_USAGE` where granted |
 
@@ -1500,7 +1502,7 @@ and then it changes here, for every build after.
 |---|---|---|
 | D-01 | Filtering | Invariant 1. |
 | D-02 | Aggregation | Invariant 2. |
-| D-03 | `CLN.XREF` | Not read by the pipeline, ever. Classification is derived from the staged source. The master table in that schema is written by promotion only, outside the build. |
+| D-03 | `CLN.XREF` | Classification never derives from CLN.XREF. The build may read KSL_MASTER_ACCOUNT_HIERARCHY only to report the key-match rate and conflicts with reviewed rows; it never writes. |
 | D-04 | The classifier | `XREF_ACCOUNT_CLASSIFICATION` is the only classifier. Derivation proposes at insert; after insert a row is never re-proposed (except a re-seed under D-44). No runtime precedence exists and none is to be built. |
 | D-05 | Classification grain | Five parts: lane, site, department, `ACCOUNT_KEY`, `RECORD_TYPE`. Unique. No wildcards, no inheritance, no precedence. |
 | D-06 | `ACCOUNT_KEY` | `coalesce(nullif(trim(ACCOUNT_NUMBER),''), nullif(trim(STAT_ACCOUNT),''), nullif(trim(SOURCE_ITEM_ID),''), '~BLANK~')`, built in staging, raw columns carried alongside. `SOURCE_ITEM_ID` is the lane's own line-item identifier, declared at M1, null where the lane has none. The `nullif(trim())` is not optional — without it an empty string becomes the key instead of the sentinel. No lane-specific exception. |
@@ -1510,7 +1512,7 @@ and then it changes here, for every build after.
 | D-10 | `H2` | Section for money, unit family for statistics. |
 | D-11 | The hierarchy | `H2` is Level 1 and `H3` is Level 2 of the standard chart of accounts in §5, fixed across every build. `H4` and `H5` are reserved and seed `UNCLASSIFIED`. The lane's `H2` mapping reaches Level 1 and no further; `H3` seeds `UNCLASSIFIED` unless the source states a sub-category outright. Loose keyword guessing at Level 2 is rejected. |
 | D-12 | `P_L_SECTION` and `NORMAL_BALANCE` | A fixed function of `H2`, never guessed independently and never set per account. Asserted by check 2(k). |
-| D-13 | Polarity | `VALUE_SIGN` follows `NORMAL_BALANCE`: Credit `+1`, Debit `-1`, Mixed null, and null outside the income statement. `SOURCE_AMOUNT` is carried as booked with the source's own signs; `VALUE` is null wherever the sign is. |
+| D-13 | Polarity | `VALUE_SIGN` follows `NORMAL_BALANCE`: Credit `+1`, Debit `-1`, Mixed null, and null outside the income statement. `SOURCE_AMOUNT` is carried as booked with the source's own signs; `VALUE` is null wherever the sign is. Exception: a contra line approved by the owner for a lane and listed here carries the opposite sign; it keeps its `H2`, `P_L_SECTION` and `NORMAL_BALANCE`. Asserted by check 2(l). **Contra lines:** ALTERRA (build 11): Revenue - Home Owners. |
 | D-14 | The merge | Insert-only (the build's own snapshot, except a re-seed under D-44; the master follows D-47) on classification columns; an existing key has only `LAST_SEEN_RUN_ID` updated. `CREATE TABLE IF NOT EXISTS` precedes it every run. |
 | D-15 | Persistence | The classification table persists across runs **and across builds**, one set of rows per lane, which keeps the review report stable. A build seeds only its own lanes, and nothing is ever read back into it. |
 | D-16 | Category | A column in transformation. In semantic the income statement splits into three tables by category; balance sheet and operating metrics each carry `CATEGORY` in one table. |
@@ -1544,8 +1546,8 @@ and then it changes here, for every build after.
 | D-44 | Rebuilding a lane | The owner may declare existing lanes rebuilt at M1. The build may replace those lanes' code, seeder branch and lane blocks, and retire objects only they used. Classification rows are never deleted. The key rule is unchanged, and M4 proves it: existing keys reproduced, new keys explained by new data, dead keys kept. Any existing account appearing under a different key is a stop. Exception: when the owner approves a changed H2 mapping for a rebuilt lane (D-46), the build re-seeds that lane's classification columns in its own snapshot (DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION). Keys are never added, removed or moved by this; only H1-H5, section, balance, sign, `METRIC_UNIT`, `AGGREGATION_TYPE` and seed source change, and only to the values the approved mapping gives. The master is updated only through D-47. |
 | D-45 | Scenario never null | Where the source names a scenario, SCENARIO is that name verbatim. Where it names none and the category comes from the source table or an unpivoted measure column, SCENARIO is that table name (no schema) or column name, verbatim. Applied to each lane at its next build or rebuild. |
 | D-46 | `H2` seeding | A section digit seeds `H1` only (1-3 Balance Sheet, 4 Revenue, 5-7 Expense, 8 Below the Line, 9 Allocations & Reserves); `H2` seeds `UNCLASSIFIED` unless the lane's mapping assigns it. `H2` comes from a per-lane mapping established at M1 from that lane's own evidence (account blocks, a source dictionary or class, or a hierarchy parent), recorded in `docs/sources.md` with examples and approved by the owner at stop 1 or stop 3 like any other mapping. M1 reports each lane's chart structure so the mapping is approved before M4. Never reuse another lane's mapping. Recorded from Q-13 (INVITED_CLUBS) and Q-09 (DAVIDSON). |
-| D-47 | Guarded master merge | Promotion step 1 is a guarded merge into CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY, run by the owner after approval (script: "Claude outputs/MASTER_MERGE_D47.sql"). New keys are inserted. An existing key is updated only when REVIEWED_BY is null and the approved seed changed; the old row is archived to KSL_MASTER_ACCOUNT_HIERARCHY_HISTORY first. Rows a person reviewed are never changed, only listed. SPROC_RUN_PIPELINE stays insert-only. The build itself still never reads or writes the master. |
-| D-48 | Source precedence | A classified row may go to `UNKNOWN` as `DUPLICATE_DETAIL` only under a source-precedence rule approved by the owner for that lane and listed here; it keeps its `H1`-`H5`. Asserted by check 2(e) and 2(m). **Rules:** HERSHA (build 10): for `ACTUAL`, `CLN_HERSHA_TB_ACTUAL` beats `CLN_HERSHA_GL_ACTUAL` at every hotel (`COMPANY_ID`) TB carries; for `FORECAST`, `CLN_HERSHA_GL_ACTUAL` beats `CLN_HERSHA_TB_ACTUAL`. |
+| D-47 | Guarded master merge | Promotion step 1 is a guarded merge into CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY, run by the owner after approval (script: "Claude outputs/MASTER_MERGE_D47.sql"). New keys are inserted. An existing key is updated only when REVIEWED_BY is null and the approved seed changed; the old row is archived to KSL_MASTER_ACCOUNT_HIERARCHY_HISTORY first. Rows a person reviewed are never changed, only listed. SPROC_RUN_PIPELINE stays insert-only. The build itself never writes the master, and reads it only as D-03 allows. |
+| D-48 | Source precedence | A classified row may go to `UNKNOWN` as `DUPLICATE_DETAIL` only under a source-precedence rule approved by the owner for that lane and listed here; it keeps its `H1`-`H5`. Asserted by check 2(e) and 2(m). **Rules:** HERSHA (build 10): for `ACTUAL`, `CLN_HERSHA_TB_ACTUAL` beats `CLN_HERSHA_GL_ACTUAL` at every hotel (`COMPANY_ID`) TB carries; for `FORECAST`, `CLN_HERSHA_GL_ACTUAL` beats `CLN_HERSHA_TB_ACTUAL`. ALTERRA (build 11): the resorts' "... - Rentals & Repairs - Ski Butlers" lines in `CLN_ALTERRA_MONTHLY_FINANCIALS` beat the Ski Butlers entity's "Alterra Resorts" section copy of them. |
 
 ### Questions
 

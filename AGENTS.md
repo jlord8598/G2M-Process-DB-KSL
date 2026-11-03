@@ -41,7 +41,8 @@ USE WAREHOUSE G2M_MCP_AGENT_WH;
 | Source | `CLN.<SOURCE>`, this build's declared source schema (for example `CLN.BOX_INVESTMENT_DATA`), under a load freeze: the tables assigned to this build's declared lanes. A change to any of them mid-build is a stop (`CLAUDE.md` D-43). |
 | Metadata | `DEV_G2M_AI.INFORMATION_SCHEMA`, `CLN.INFORMATION_SCHEMA`, `SNOWFLAKE.ACCOUNT_USAGE` where granted |
 
-**`CLN.XREF` is out of scope.** It is a schema, not a word — a `CLN.CLEAN`
+**`CLN.XREF` is out of scope for classification; the master may be read only
+as `CLAUDE.md` D-03 allows.** It is a schema, not a word — a `CLN.CLEAN`
 table whose name contains `XREF` is in scope like any other.
 
 **List `CLN.<SOURCE>` at M1, then assign each table to a declared lane or mark it
