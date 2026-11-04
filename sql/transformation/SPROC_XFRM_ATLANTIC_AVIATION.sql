@@ -24,7 +24,11 @@ $$
 -- Source precedence (D-48): no rule for this lane; no row loses.
 -- Pacing: the lane has no pacing source (M1); built empty.
 -- SCENARIO is carried verbatim; category never replaces it (D-17).
--- VALUE = SOURCE_AMOUNT * VALUE_SIGN. SOURCE_AMOUNT and STAT_VALUE unchanged.
+-- Scale (owner build 12 Q-07): the template states (000's). SOURCE_AMOUNT and
+-- STAT_VALUE = staged value x SOURCE_UNIT_SCALE (1000 for dollar lines and
+-- Gallons, 1 for MPG, Landings, Trips: N-17); the scale and its source are
+-- carried. Reconcile: CLN = STG as booked; STG x scale = XFRM = SEM.
+-- VALUE = SOURCE_AMOUNT * VALUE_SIGN.
 -- No filter, no aggregation. The scratch table is dropped before return.
 -- Built from the lane-independent text of SPROC_XFRM_ATLANTIC_AVIATION.
 -- ============================================================================
@@ -67,6 +71,7 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , source_unit_scale, source_unit_scale_source
         from DEV_G2M_AI.STAGING.STG_ATLANTIC_AVIATION_OC_DATA
     )
     -- ------------------------------------------------------------------------
@@ -115,14 +120,16 @@ begin
         , cls.normal_balance::varchar                          as normal_balance
         , cat.is_subtotal::boolean                             as is_subtotal
         , cat.subtotal_source::varchar                         as subtotal_source
-        , cat.source_amount::float                             as source_amount
-        , cat.stat_value::float                                as stat_value
+        , (cat.source_amount * cat.source_unit_scale)::float   as source_amount
+        , (cat.stat_value * cat.source_unit_scale)::float      as stat_value
         , cat.source_line_key::varchar                         as source_line_key
         , cat.source_table::varchar                            as source_table
         , cls.value_sign::number(2,0)                          as value_sign
-        , (cat.source_amount * cls.value_sign)::float          as value
+        , (cat.source_amount * cat.source_unit_scale * cls.value_sign)::float as value
         , cls.metric_unit::varchar                             as metric_unit
         , cls.aggregation_type::varchar                        as aggregation_type
+        , cat.source_unit_scale::number(10,0)                  as source_unit_scale
+        , cat.source_unit_scale_source::varchar                as source_unit_scale_source
         , case
               when cat.d48_loses                                    then 'DUPLICATE_DETAIL'
               when cls.h1 = 'Unclassified' and cat.category is null then 'BOTH'
@@ -189,6 +196,7 @@ begin
         , source_amount, stat_value, source_line_key, source_table
         , value_sign, value, metric_unit, aggregation_type
         , unknown_reason, unresolved_category_value
+        , source_unit_scale, source_unit_scale_source
     from DEV_G2M_AI.TRANSFORMATION.TMP_XFRM_ATLANTIC_AVIATION_ROWS
     where 1=1
       and (unknown_reason is not null

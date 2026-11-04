@@ -22,6 +22,8 @@ $$
 -- row of a line item that a site also carries (owner, Q-02).
 -- The source's IS_SUBTOTAL is carried as SRC_IS_SUBTOTAL.
 -- SCENARIO = the branch's measure column name (D-45). Signs as booked.
+-- SOURCE_UNIT_SCALE (build 12, Q-07): 1000 for dollar lines and Gallons, 1 for
+-- MPG, Landings, Trips. Values stay as booked here; XFRM applies the scale.
 -- SOURCE_LINE_KEY: ENTITY|SECTION|LINE_ITEM|PERIOD_DATE|branch, unique (M1).
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried verbatim.
 -- ============================================================================
@@ -55,6 +57,15 @@ begin
             , (case when unp.line_item in ('Landings', 'Trips', 'Gallons', 'MPG') then 'STATISTIC' else 'AMOUNT' end) as c_rtype
             , (case when unp.line_item in ('Landings', 'Trips', 'Gallons', 'MPG') then 'LINE_ITEM ' || unp.line_item || ': STATISTIC (derived, M1)' else 'LINE_ITEM: AMOUNT (derived, M1)' end) as c_rtype_source
             , max(iff(not unp.is_rollup, 1, 0)) over (partition by unp.line_item) as c_site_line
+            -- Q-07 (build 12): the template states (000's). Dollar lines (every
+            -- AMOUNT line, Fuel Margin included) and Gallons are in thousands
+            -- (Fuel Revenue / Gallons = 5.11 per gallon as stored); MPG, Landings
+            -- and Trips are carried as booked (N-17). Staging keeps the source
+            -- value; transformation multiplies by SOURCE_UNIT_SCALE.
+            , (case when unp.line_item in ('Landings', 'Trips', 'MPG') then 1 else 1000 end)::number(10,0) as c_scale
+            , (case when unp.line_item in ('Landings', 'Trips', 'MPG') then 'as booked: not proven in thousands (owner Q-07; N-17)'
+                    when unp.line_item = 'Gallons' then 'template header (000''s); proven: Fuel Revenue / Gallons = 5.11 per gallon as stored (Q-07)'
+                    else 'template header (000''s): dollar measure (Q-07)' end)::varchar as c_scale_source
             , coalesce(unp.is_subtotal
                 or unp.line_item in ('Fuel Gross Profit', 'Rent Gross Profit', 'Service Gross Profit', 'Other Gross Profit', 'Pre-Corporate OpEx EBITDA', 'Adj. EBITDA', 'Unadjusted EBITDA', 'OfficeConnect EBITDA', 'Net Debt', 'Check', 'Check - Debt', 'Check total vs all pieces', 'Revenue | Revenue | #2', 'Revenue | Revenue | #3', 'COS', 'COS | COS | #2', 'OpEx', 'OpEx | OpEx | #2', 'Non-Cash', 'Operating One-Times')
                 or (unp.section = 'Debt' and unp.line_item = 'Revenue')
@@ -97,6 +108,8 @@ begin
         , cln.c_subtotal::boolean                                               as is_subtotal
         , cln.c_subtotal_source::varchar                                        as subtotal_source
         , cln.c_line_key::varchar                                              as source_line_key
+        , cln.c_scale::number(10,0)                                            as source_unit_scale
+        , cln.c_scale_source::varchar                                          as source_unit_scale_source
         , cln.measure_column::varchar                                           as measure_column
         , cln.m_path::varchar                                                   as measure_source_file_path
         , cln.m_row::varchar                                                    as measure_source_row

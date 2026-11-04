@@ -11,6 +11,8 @@ $$
 -- self-contained block per lane between BEGIN LANE / END LANE markers.
 -- Columns: the section 4 common block, then METRIC_UNIT, AGGREGATION_TYPE.
 -- No VALUE_SIGN, no VALUE (D-18). The measure is STAT_VALUE.
+-- CURRENCY_CODE (build 12, owner Q-06 / Q-10): a per-lane literal after
+-- SOURCE_AMOUNT; BEAUMIER MIXED (N-19), ALTERRA UNCONFIRMED (N-18).
 -- ============================================================================
 declare
     v_rows integer;
@@ -44,6 +46,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'USD'::varchar              as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -81,6 +84,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'USD'::varchar              as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -118,6 +122,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'USD'::varchar              as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -155,6 +160,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'USD'::varchar              as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -192,6 +198,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'USD'::varchar              as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -229,6 +236,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'USD'::varchar              as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -266,6 +274,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'MIXED'::varchar            as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -303,6 +312,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'USD'::varchar              as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -340,6 +350,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'UNCONFIRMED'::varchar      as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -377,6 +388,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'USD'::varchar              as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table
@@ -414,6 +426,7 @@ begin
         , is_subtotal::boolean        as is_subtotal
         , subtotal_source::varchar    as subtotal_source
         , source_amount::float        as source_amount
+        , 'EUR'::varchar              as currency_code
         , stat_value::float           as stat_value
         , source_line_key::varchar    as source_line_key
         , source_table::varchar       as source_table

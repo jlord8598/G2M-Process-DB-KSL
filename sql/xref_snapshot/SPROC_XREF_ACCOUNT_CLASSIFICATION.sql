@@ -25,7 +25,7 @@ $$
 --              INVITED_CLUBS and NEWBURY once, by an approved D-44 UPDATE of the
 --              classification columns (scripts/reseed_build08.sql).
 -- One derivation branch per lane (DAVIDSON added in build 06; ALTERRA,
--- ATLANTIC_AVIATION and JW_VENICE in build 11). No exception
+-- ATLANTIC_AVIATION and JW_VENICE in build 11; JW_VENICE rebuilt build 12). No exception
 -- is caught; an undeclared lane
 -- raises.
 -- ============================================================================
@@ -1880,7 +1880,7 @@ begin
 
     elseif (:P_LANE = 'JW_VENICE') then
         -- ====================================================================
-        -- LANE JW_VENICE (build 11)
+        -- LANE JW_VENICE (build 11; rebuilt build 12, D-44)
         -- Facts: FCAST_ACT_FORECAST, FCAST_BY_PERIOD (DEPARTMENT = SECTION,
         --   ACCOUNT_KEY = LINE_ITEM); FTE, HEADCOUNT (DEPARTMENT = DEPARTMENT_LABEL,
         --   ACCOUNT_KEY = the table subject, Q-04).
@@ -1892,6 +1892,13 @@ begin
         --   INC/EXP EXCL. OWNER EXP. and OWNER INTEREST & INCOME TAX (Q-11) ->
         --   Below the Line / Other Income / (Expense); Isolated / One off costs
         --   -> Below the Line / Other Income / (Expense).
+        -- Build 12: + MONTHLY_PL_DEPT (DEPARTMENT = the sheet, ACCOUNT_KEY =
+        --   LINE_ITEM). Its keys are all new (none overlap build 11's). Account
+        --   blocks of the 6-digit GL code (owner Q-04): 3 Revenue; 4 Cost of
+        --   Goods Sold; 51/52/54/56/58 Payroll; 6 Operating Expenses; 7
+        --   Operating Expenses except 701110 (replacement reserve, below EBITDA)
+        --   -> Below the Line / Other Income / (Expense). STATISTIC -> Statistic,
+        --   H2 = the line text.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -1902,23 +1909,28 @@ begin
             fact as (
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , is_subtotal, subtotal_source
+                     , is_subtotal, subtotal_source, false as is_mpd
                 from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_ACT_FORECAST
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , is_subtotal, subtotal_source
+                     , is_subtotal, subtotal_source, false as is_mpd
                 from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_BY_PERIOD
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , is_subtotal, subtotal_source
+                     , is_subtotal, subtotal_source, false as is_mpd
                 from DEV_G2M_AI.STAGING.STG_JW_VENICE_FTE
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , is_subtotal, subtotal_source
+                     , is_subtotal, subtotal_source, false as is_mpd
                 from DEV_G2M_AI.STAGING.STG_JW_VENICE_HEADCOUNT
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , is_subtotal, subtotal_source, true as is_mpd
+                from DEV_G2M_AI.STAGING.STG_JW_VENICE_MONTHLY_PL_DEPT
             )
             -- ----------------------------------------------------------------
             -- extract: one row per five-part key, attributes by MIN()
@@ -1937,6 +1949,8 @@ begin
                     , min(account_desc)                                       as account_desc
                     , boolor_agg(is_subtotal)                                 as m_subtotal
                     , min(subtotal_source)                                    as m_subtotal_source
+                    , boolor_agg(is_mpd)                                      as m_mpd
+                    , split_part(min(account_key), ' | ', 1)                  as m_code
                 from fact
                 where 1=1
                 group by 1, 2, 3, 4, 5
@@ -1949,6 +1963,13 @@ begin
                       ext.*
                     , case
                           when m_subtotal                                         then 'UNCLASSIFIED'
+                          when m_mpd and k_rtype = 'STATISTIC'                    then k_acct
+                          when m_mpd and m_code = '701110'                        then 'Other Income / (Expense)'
+                          when m_mpd and left(m_code, 1) = '3'                    then 'Revenue'
+                          when m_mpd and left(m_code, 1) = '4'                    then 'Cost of Goods Sold'
+                          when m_mpd and left(m_code, 2) in ('51', '52', '54', '56', '58') then 'Payroll'
+                          when m_mpd and left(m_code, 1) in ('6', '7')            then 'Operating Expenses'
+                          when m_mpd                                              then 'UNCLASSIFIED'
                           when k_rtype = 'STATISTIC' and k_acct in ('FTE', 'HEADCOUNT') then k_acct
                           when k_rtype = 'STATISTIC'                              then k_dept
                           when k_dept = 'KEY STATISTICS' and k_acct = 'CREDIT CARD EXPENSE' then 'Operating Expenses'
@@ -1970,10 +1991,16 @@ begin
                           when h2 = 'Revenue'                   then 'Revenue'
                           when h2 = 'Other Income / (Expense)'  then 'Below the Line'
                           when h2 = 'Operating Expenses'        then 'Expense'
+                          when h2 = 'Cost of Goods Sold'        then 'Expense'
+                          when h2 = 'Payroll'                   then 'Expense'
                           else 'Unclassified'
                       end as h1
                     , case
                           when m_subtotal                       then 'source subtotal or computed line (' || m_subtotal_source || '): SOURCE_ROLLUP, not classified'
+                          when m_mpd and k_rtype = 'STATISTIC'  then 'MONTHLY_PL_DEPT RECORD_TYPE STATISTIC; H2 = the line text (D-38; build 12)'
+                          when m_mpd and m_code = '701110'      then 'MONTHLY_PL_DEPT 701110 replacement reserve: below EBITDA, Below the Line (owner, build 12 Q-04)'
+                          when m_mpd and h2 <> 'UNCLASSIFIED'   then 'MONTHLY_PL_DEPT GL block ' || left(m_code, iff(left(m_code, 1) = '5', 2, 1)) || 'xxxxx: ' || h2 || ' (owner, build 12 Q-04)'
+                          when m_mpd                            then 'MONTHLY_PL_DEPT ' || m_code || ': no approved block'
                           when k_rtype = 'STATISTIC'            then 'RECORD_TYPE STATISTIC; H2 = ' || h2 || ', the source section or table subject (D-38, Q-04)'
                           when k_acct = 'CREDIT CARD EXPENSE'   then 'KEY STATISTICS CREDIT CARD EXPENSE: money, Operating Expenses (owner, stop 1)'
                           when h2 = 'Other Income / (Expense)' and k_dept = 'UNDISTRIBUTED OPERATING EXP' then k_acct || ': Below the Line (owner Q-11)'

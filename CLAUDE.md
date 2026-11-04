@@ -496,6 +496,9 @@ NORMAL_BALANCE           VARCHAR       -- Debit | Credit | Mixed | null
 IS_SUBTOTAL              BOOLEAN       -- the source's own total or rollup row
 SUBTOTAL_SOURCE          VARCHAR       -- how it was identified, or that it cannot be
 SOURCE_AMOUNT            FLOAT         -- as booked, sign included
+CURRENCY_CODE            VARCHAR       -- ISO code of SOURCE_AMOUNT, per lane from
+                                       -- source evidence or owner confirmation;
+                                       -- 'MIXED' / 'UNCONFIRMED' where not settled
 STAT_VALUE               FLOAT         -- the statistic measure
 SOURCE_LINE_KEY          VARCHAR       -- null where the lane has no natural key
 SOURCE_TABLE             VARCHAR       -- which source table the row came from; never null
@@ -515,6 +518,21 @@ key's displayed description is not an error; it is the source varying.
 **`SOURCE_AMOUNT` is carried as booked, sign included.** A source that books
 expenses negative keeps those negatives. The build applies no sign of its own;
 that is `VALUE`.
+
+**One exception: a stated unit scale.** Where a lane's source states that its
+figures are in thousands (or another unit) and the data proves it, staging
+carries the value as booked with `SOURCE_UNIT_SCALE` and its evidence in
+`SOURCE_UNIT_SCALE_SOURCE`, and transformation multiplies `SOURCE_AMOUNT` and
+`STAT_VALUE` by it. Only measures the data proves are scaled; the rest carry
+scale 1. Approved per lane and listed in D-49. The reconcile states CLN = STG
+as booked, and CLN x scale = STG x scale = XFRM = SEM.
+
+**`CURRENCY_CODE` states the currency of `SOURCE_AMOUNT` and `VALUE`.** Set
+per lane, from what the source states or the owner confirms, and recorded in
+`docs/sources.md`. It is never converted. Where a lane holds more than one
+currency and its rows cannot yet carry their own, the value is `MIXED`; where
+nothing states it, `UNCONFIRMED`. Both are logged in `docs/open-items.md`.
+Amounts in different currencies are never summed.
 
 ### Subtotals the source supplies
 
@@ -1547,7 +1565,8 @@ and then it changes here, for every build after.
 | D-45 | Scenario never null | Where the source names a scenario, SCENARIO is that name verbatim. Where it names none and the category comes from the source table or an unpivoted measure column, SCENARIO is that table name (no schema) or column name, verbatim. Applied to each lane at its next build or rebuild. |
 | D-46 | `H2` seeding | A section digit seeds `H1` only (1-3 Balance Sheet, 4 Revenue, 5-7 Expense, 8 Below the Line, 9 Allocations & Reserves); `H2` seeds `UNCLASSIFIED` unless the lane's mapping assigns it. `H2` comes from a per-lane mapping established at M1 from that lane's own evidence (account blocks, a source dictionary or class, or a hierarchy parent), recorded in `docs/sources.md` with examples and approved by the owner at stop 1 or stop 3 like any other mapping. M1 reports each lane's chart structure so the mapping is approved before M4. Never reuse another lane's mapping. Recorded from Q-13 (INVITED_CLUBS) and Q-09 (DAVIDSON). |
 | D-47 | Guarded master merge | Promotion step 1 is a guarded merge into CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY, run by the owner after approval (script: "Claude outputs/MASTER_MERGE_D47.sql"). New keys are inserted. An existing key is updated only when REVIEWED_BY is null and the approved seed changed; the old row is archived to KSL_MASTER_ACCOUNT_HIERARCHY_HISTORY first. Rows a person reviewed are never changed, only listed. SPROC_RUN_PIPELINE stays insert-only. The build itself never writes the master, and reads it only as D-03 allows. |
-| D-48 | Source precedence | A classified row may go to `UNKNOWN` as `DUPLICATE_DETAIL` only under a source-precedence rule approved by the owner for that lane and listed here; it keeps its `H1`-`H5`. Asserted by check 2(e) and 2(m). **Rules:** HERSHA (build 10): for `ACTUAL`, `CLN_HERSHA_TB_ACTUAL` beats `CLN_HERSHA_GL_ACTUAL` at every hotel (`COMPANY_ID`) TB carries; for `FORECAST`, `CLN_HERSHA_GL_ACTUAL` beats `CLN_HERSHA_TB_ACTUAL`. ALTERRA (build 11): the resorts' "... - Rentals & Repairs - Ski Butlers" lines in `CLN_ALTERRA_MONTHLY_FINANCIALS` beat the Ski Butlers entity's "Alterra Resorts" section copy of them. |
+| D-48 | Source precedence | A classified row may go to `UNKNOWN` as `DUPLICATE_DETAIL` only under a source-precedence rule approved by the owner for that lane and listed here; it keeps its `H1`-`H5`. Asserted by check 2(e) and 2(m). **Rules:** HERSHA (build 10): for `ACTUAL`, `CLN_HERSHA_TB_ACTUAL` beats `CLN_HERSHA_GL_ACTUAL` at every hotel (`COMPANY_ID`) TB carries; for `FORECAST`, `CLN_HERSHA_GL_ACTUAL` beats `CLN_HERSHA_TB_ACTUAL`. ALTERRA (build 11): the resorts' "... - Rentals & Repairs - Ski Butlers" lines in `CLN_ALTERRA_MONTHLY_FINANCIALS` beat the Ski Butlers entity's "Alterra Resorts" section copy of them. JW_VENICE (build 12): for `ACTUAL` in 2025-08 and 2026-08, `CLN_JW_VENICE_MONTHLY_PL_DEPT` beats `CLN_JW_VENICE_FCAST_ACT_FORECAST` and `CLN_JW_VENICE_FCAST_BY_PERIOD`; within `CLN_JW_VENICE_MONTHLY_PL_DEPT`, `PERIOD_TYPE` MONTH beats YTD, the TOT_HTL sheet beats every other sheet (the 16 department sheets, CB included), and the first 98xxxx hours block beats its repeat (`<code> \| <text> \| #n`). |
+| D-49 | Unit scale | A lane's stated source unit is applied in transformation from a staged `SOURCE_UNIT_SCALE`, only for measures the data proves, as approved by the owner and listed here. Staging stays as booked. **Scales:** ATLANTIC_AVIATION (build 12): x1000 for every dollar line, Fuel Margin and Gallons ("(000's)"; Fuel Revenue / Gallons = 5.11 per gallon as stored); MPG, Landings, Trips x1 (N-17). |
 
 ### Questions
 

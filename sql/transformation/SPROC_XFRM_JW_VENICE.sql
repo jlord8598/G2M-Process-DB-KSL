@@ -15,14 +15,24 @@ $$
 --   XFRM_JW_VENICE_UNKNOWN            H1 Unclassified, or category unresolved, or
 --                               the losing row of a D-48 precedence rule
 -- Fact rows joined once to the classification on the five-part key,
--- sentinel-coalesced identically to the seeder. Facts: FCAST_ACT_FORECAST, FCAST_BY_PERIOD, FTE, HEADCOUNT.
+-- sentinel-coalesced identically to the seeder. Facts: FCAST_ACT_FORECAST, FCAST_BY_PERIOD, FTE, HEADCOUNT,
+-- MONTHLY_PL_DEPT (build 12, D-44 rebuild).
 -- Category (section 6), row by row, from the branch (MEASURE_COLUMN):
 --   ACTUAL, FORECAST, BUDGET -> themselves;
 --   PREVIOUS_FORECAST -> FORECAST, its scenario PREVIOUS_FORECAST_AMOUNT kept; anything else unresolved.
 -- UNKNOWN_REASON: SOURCE_ROLLUP for a source subtotal or computed line
 --   (IS_SUBTOTAL, key Unclassified at the seeder); UNCLASSIFIED_ACCOUNT for any
 --   other Unclassified key.
--- Source precedence (D-48): no rule for this lane; no row loses.
+-- Source precedence (D-48, owner build 12): a classified row that loses goes to
+-- UNKNOWN as DUPLICATE_DETAIL, keeping H1-H5; an unclassified row keeps its own
+-- reason (SOURCE_ROLLUP / UNCLASSIFIED_ACCOUNT). The row loses when:
+--   (Q-02) FCAST_ACT_FORECAST or FCAST_BY_PERIOD, ACTUAL, period 2025-08 or
+--          2026-08: MONTHLY_PL_DEPT beats it; every other FCAST month stays;
+--   (Q-03) MONTHLY_PL_DEPT PERIOD_TYPE YTD: MONTH beats it;
+--   (Q-09) MONTHLY_PL_DEPT department sheet other than TOT_HTL: TOT_HTL's
+--          GL-account rows are the detail;
+--   (Q-11) MONTHLY_PL_DEPT repeated 98xxxx hours block ('<code> | <text> | #n'):
+--          the first block beats it.
 -- Pacing: the lane has no pacing source (M1); built empty.
 -- SCENARIO is carried verbatim; category never replaces it (D-17).
 -- VALUE = SOURCE_AMOUNT * VALUE_SIGN. SOURCE_AMOUNT and STAT_VALUE unchanged.
@@ -68,25 +78,36 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , false as is_mpd, null::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_ACT_FORECAST
         union all
         select source_lane, source_site_code, asset_name, department, department_name
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , false as is_mpd, null::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_BY_PERIOD
         union all
         select source_lane, source_site_code, asset_name, department, department_name
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , false as is_mpd, null::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_FTE
         union all
         select source_lane, source_site_code, asset_name, department, department_name
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , false as is_mpd, null::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_HEADCOUNT
+        union all
+        select source_lane, source_site_code, asset_name, department, department_name
+             , account_number, stat_account, account_key, record_type, record_type_source
+             , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
+             , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , true as is_mpd, period_type::varchar as period_type
+        from DEV_G2M_AI.STAGING.STG_JW_VENICE_MONTHLY_PL_DEPT
     )
     -- ------------------------------------------------------------------------
     -- category, row by row, from the branch; D-48 flag
@@ -101,7 +122,16 @@ begin
                   when fact.measure_column = 'BUDGET'            then 'BUDGET'
               end as category
             , coalesce(fact.measure_column, '~BLANK~') as category_input
-            , (false)::boolean as d48_loses
+            , (case
+                  when not fact.is_mpd
+                   and fact.source_table in ('CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FCAST_ACT_FORECAST', 'CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FCAST_BY_PERIOD')
+                   and fact.measure_column = 'ACTUAL'
+                   and fact.period_end in ('2025-08-31'::date, '2026-08-31'::date)  then true
+                  when fact.is_mpd and fact.period_type = 'YTD'                   then true
+                  when fact.is_mpd and fact.department <> 'TOT_HTL'               then true
+                  when fact.is_mpd and regexp_like(fact.account_key, '98[0-9]{4} [|] .* [|] #[0-9]+') then true
+                  else false
+              end)::boolean as d48_loses
         from fact
         where 1=1
     )
@@ -143,7 +173,7 @@ begin
         , cls.metric_unit::varchar                             as metric_unit
         , cls.aggregation_type::varchar                        as aggregation_type
         , case
-              when cat.d48_loses                                    then 'DUPLICATE_DETAIL'
+              when cat.d48_loses and cls.h1 <> 'Unclassified'       then 'DUPLICATE_DETAIL'
               when cls.h1 = 'Unclassified' and cat.category is null then 'BOTH'
               when cls.h1 = 'Unclassified' and cat.is_subtotal      then 'SOURCE_ROLLUP'
               when cls.h1 = 'Unclassified'                          then 'UNCLASSIFIED_ACCOUNT'
