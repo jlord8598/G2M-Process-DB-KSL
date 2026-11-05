@@ -29,6 +29,8 @@ $$
 -- SCENARIO is carried verbatim; category never replaces it (D-17).
 -- VALUE = SOURCE_AMOUNT * VALUE_SIGN. SOURCE_AMOUNT and STAT_VALUE unchanged.
 -- No filter, no aggregation. The scratch table is dropped before return.
+-- UNKNOWN_REASON SOURCE_ROLLUP (build 13, owner Q-02, Q-07): an Unclassified
+-- key on a source subtotal row (IS_SUBTOTAL, staging). Otherwise as before.
 -- ============================================================================
 declare
     v_is  integer;
@@ -175,6 +177,7 @@ begin
         , cls.aggregation_type::varchar                        as aggregation_type
         , case
               when cls.h1 = 'Unclassified' and cat.category is null then 'BOTH'
+              when cls.h1 = 'Unclassified' and cat.is_subtotal      then 'SOURCE_ROLLUP'
               when cls.h1 = 'Unclassified'                          then 'UNCLASSIFIED_ACCOUNT'
               when cat.category is null                             then 'UNRESOLVED_CATEGORY'
           end::varchar                                         as unknown_reason

@@ -1,0 +1,321 @@
+-- ============================================================================
+-- scripts/earlier_build_hashes.sql  (build 13, check 5)
+-- Every object of every lane NOT rebuilt in build 13: HHG, NEWBURY, HERSHA,
+-- INVITED_CLUBS, BEAUMIER, DAVIDSON, ALTERRA, ATLANTIC_AVIATION, JW_VENICE.
+-- 157 objects. content_hash: full content (RUN_ID / LAST_SEEN_RUN_ID
+-- excluded). rest_hash: also excluding CURRENCY_CODE. Both must be identical
+-- before this build's first run and after its last.
+-- ============================================================================
+select 'SEMANTIC.SEM_AI_BALANCE_SHEET BEAUMIER' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_BALANCE_SHEET where source_lane = 'BEAUMIER'
+union all
+select 'SEMANTIC.SEM_AI_BALANCE_SHEET DAVIDSON' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_BALANCE_SHEET where source_lane = 'DAVIDSON'
+union all
+select 'SEMANTIC.SEM_AI_BALANCE_SHEET INVITED_CLUBS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_BALANCE_SHEET where source_lane = 'INVITED_CLUBS'
+union all
+select 'SEMANTIC.SEM_AI_BALANCE_SHEET NEWBURY' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_BALANCE_SHEET where source_lane = 'NEWBURY'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL BEAUMIER' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL where source_lane = 'BEAUMIER'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL DAVIDSON' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL where source_lane = 'DAVIDSON'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL INVITED_CLUBS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL where source_lane = 'INVITED_CLUBS'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL NEWBURY' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL where source_lane = 'NEWBURY'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET BEAUMIER' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET where source_lane = 'BEAUMIER'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET DAVIDSON' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET where source_lane = 'DAVIDSON'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET INVITED_CLUBS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET where source_lane = 'INVITED_CLUBS'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET NEWBURY' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET where source_lane = 'NEWBURY'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST BEAUMIER' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST where source_lane = 'BEAUMIER'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST DAVIDSON' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST where source_lane = 'DAVIDSON'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST INVITED_CLUBS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST where source_lane = 'INVITED_CLUBS'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST NEWBURY' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST where source_lane = 'NEWBURY'
+union all
+select 'SEMANTIC.SEM_AI_OPERATING_METRICS BEAUMIER' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS where source_lane = 'BEAUMIER'
+union all
+select 'SEMANTIC.SEM_AI_OPERATING_METRICS DAVIDSON' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS where source_lane = 'DAVIDSON'
+union all
+select 'SEMANTIC.SEM_AI_OPERATING_METRICS INVITED_CLUBS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS where source_lane = 'INVITED_CLUBS'
+union all
+select 'SEMANTIC.SEM_AI_OPERATING_METRICS NEWBURY' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS where source_lane = 'NEWBURY'
+union all
+select 'SEMANTIC.SEM_AI_UNKNOWN BEAUMIER' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_UNKNOWN where source_lane = 'BEAUMIER'
+union all
+select 'SEMANTIC.SEM_AI_UNKNOWN DAVIDSON' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_UNKNOWN where source_lane = 'DAVIDSON'
+union all
+select 'SEMANTIC.SEM_AI_UNKNOWN INVITED_CLUBS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_UNKNOWN where source_lane = 'INVITED_CLUBS'
+union all
+select 'SEMANTIC.SEM_AI_UNKNOWN NEWBURY' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_UNKNOWN where source_lane = 'NEWBURY'
+union all
+select 'STAGING.STG_BEAUMIER_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_BEAUMIER_ACCOUNTS
+union all
+select 'STAGING.STG_BEAUMIER_BP' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_BEAUMIER_BP
+union all
+select 'STAGING.STG_BEAUMIER_BUDGET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_BEAUMIER_BUDGET
+union all
+select 'STAGING.STG_BEAUMIER_CANCELLATIONS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_BEAUMIER_CANCELLATIONS
+union all
+select 'STAGING.STG_BEAUMIER_LOCATION_MAP' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_BEAUMIER_LOCATION_MAP
+union all
+select 'STAGING.STG_DAVIDSON_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_DAVIDSON_ACCOUNTS
+union all
+select 'STAGING.STG_DAVIDSON_FULL_YEAR_PL' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_DAVIDSON_FULL_YEAR_PL
+union all
+select 'STAGING.STG_DAVIDSON_HOTEL_MONTHLY_REPORT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_DAVIDSON_HOTEL_MONTHLY_REPORT
+union all
+select 'STAGING.STG_INVITED_CLUBS_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_INVITED_CLUBS_ACCOUNTS
+union all
+select 'STAGING.STG_INVITED_CLUBS_ESSBASE_EXTRACT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_INVITED_CLUBS_ESSBASE_EXTRACT
+union all
+select 'STAGING.STG_INVITED_CLUBS_META_ACCOUNT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_INVITED_CLUBS_META_ACCOUNT
+union all
+select 'STAGING.STG_INVITED_CLUBS_META_DEPARTMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_INVITED_CLUBS_META_DEPARTMENT
+union all
+select 'STAGING.STG_INVITED_CLUBS_META_ENTITY' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_INVITED_CLUBS_META_ENTITY
+union all
+select 'STAGING.STG_INVITED_CLUBS_META_LOCATION' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_INVITED_CLUBS_META_LOCATION
+union all
+select 'STAGING.STG_INVITED_CLUBS_META_SUBACCOUNT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_INVITED_CLUBS_META_SUBACCOUNT
+union all
+select 'STAGING.STG_NEWBURY_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_NEWBURY_ACCOUNTS
+union all
+select 'STAGING.STG_NEWBURY_OPERATING_STATS_BGT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_NEWBURY_OPERATING_STATS_BGT
+union all
+select 'STAGING.STG_NEWBURY_OPERATING_STATS_EVENTSANDOOO' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_NEWBURY_OPERATING_STATS_EVENTSANDOOO
+union all
+select 'STAGING.STG_NEWBURY_OPERATING_STATS_FCST' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_NEWBURY_OPERATING_STATS_FCST
+union all
+select 'STAGING.STG_NEWBURY_OPERATING_STATS_PYACT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_NEWBURY_OPERATING_STATS_PYACT
+union all
+select 'STAGING.STG_NEWBURY_OPERATING_STATS_SHOPS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_NEWBURY_OPERATING_STATS_SHOPS
+union all
+select 'STAGING.STG_NEWBURY_OTB_1DAY_PICKUP' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_NEWBURY_OTB_1DAY_PICKUP
+union all
+select 'STAGING.STG_NEWBURY_OTB_3DAY_PICKUP' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_NEWBURY_OTB_3DAY_PICKUP
+union all
+select 'STAGING.STG_NEWBURY_TRIAL_BALANCE' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_NEWBURY_TRIAL_BALANCE
+union all
+select 'TRANSFORMATION.XFRM_BEAUMIER_BALANCE_SHEET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_BEAUMIER_BALANCE_SHEET
+union all
+select 'TRANSFORMATION.XFRM_BEAUMIER_INCOME_STATEMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_BEAUMIER_INCOME_STATEMENT
+union all
+select 'TRANSFORMATION.XFRM_BEAUMIER_OPERATING_METRICS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_BEAUMIER_OPERATING_METRICS
+union all
+select 'TRANSFORMATION.XFRM_BEAUMIER_PACING' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_BEAUMIER_PACING
+union all
+select 'TRANSFORMATION.XFRM_BEAUMIER_UNKNOWN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_BEAUMIER_UNKNOWN
+union all
+select 'TRANSFORMATION.XFRM_DAVIDSON_BALANCE_SHEET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_DAVIDSON_BALANCE_SHEET
+union all
+select 'TRANSFORMATION.XFRM_DAVIDSON_INCOME_STATEMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_DAVIDSON_INCOME_STATEMENT
+union all
+select 'TRANSFORMATION.XFRM_DAVIDSON_OPERATING_METRICS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_DAVIDSON_OPERATING_METRICS
+union all
+select 'TRANSFORMATION.XFRM_DAVIDSON_PACING' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_DAVIDSON_PACING
+union all
+select 'TRANSFORMATION.XFRM_DAVIDSON_UNKNOWN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_DAVIDSON_UNKNOWN
+union all
+select 'TRANSFORMATION.XFRM_INVITED_CLUBS_BALANCE_SHEET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_INVITED_CLUBS_BALANCE_SHEET
+union all
+select 'TRANSFORMATION.XFRM_INVITED_CLUBS_INCOME_STATEMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_INVITED_CLUBS_INCOME_STATEMENT
+union all
+select 'TRANSFORMATION.XFRM_INVITED_CLUBS_OPERATING_METRICS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_INVITED_CLUBS_OPERATING_METRICS
+union all
+select 'TRANSFORMATION.XFRM_INVITED_CLUBS_PACING' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_INVITED_CLUBS_PACING
+union all
+select 'TRANSFORMATION.XFRM_INVITED_CLUBS_UNKNOWN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_INVITED_CLUBS_UNKNOWN
+union all
+select 'TRANSFORMATION.XFRM_NEWBURY_BALANCE_SHEET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_NEWBURY_BALANCE_SHEET
+union all
+select 'TRANSFORMATION.XFRM_NEWBURY_INCOME_STATEMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_NEWBURY_INCOME_STATEMENT
+union all
+select 'TRANSFORMATION.XFRM_NEWBURY_OPERATING_METRICS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_NEWBURY_OPERATING_METRICS
+union all
+select 'TRANSFORMATION.XFRM_NEWBURY_PACING' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_NEWBURY_PACING
+union all
+select 'TRANSFORMATION.XFRM_NEWBURY_UNKNOWN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_NEWBURY_UNKNOWN
+union all
+select 'XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION BEAUMIER' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION where source_lane = 'BEAUMIER'
+union all
+select 'XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION DAVIDSON' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION where source_lane = 'DAVIDSON'
+union all
+select 'XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION INVITED_CLUBS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION where source_lane = 'INVITED_CLUBS'
+union all
+select 'XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION NEWBURY' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION where source_lane = 'NEWBURY'
+union all
+select 'SEMANTIC.SEM_AI_BALANCE_SHEET HERSHA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_BALANCE_SHEET where source_lane = 'HERSHA'
+union all
+select 'SEMANTIC.SEM_AI_BALANCE_SHEET HHG' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_BALANCE_SHEET where source_lane = 'HHG'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL HERSHA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL where source_lane = 'HERSHA'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL HHG' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL where source_lane = 'HHG'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET HERSHA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET where source_lane = 'HERSHA'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET HHG' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET where source_lane = 'HHG'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST HERSHA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST where source_lane = 'HERSHA'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST HHG' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST where source_lane = 'HHG'
+union all
+select 'SEMANTIC.SEM_AI_OPERATING_METRICS HERSHA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS where source_lane = 'HERSHA'
+union all
+select 'SEMANTIC.SEM_AI_OPERATING_METRICS HHG' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS where source_lane = 'HHG'
+union all
+select 'SEMANTIC.SEM_AI_UNKNOWN HERSHA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_UNKNOWN where source_lane = 'HERSHA'
+union all
+select 'SEMANTIC.SEM_AI_UNKNOWN HHG' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_UNKNOWN where source_lane = 'HHG'
+union all
+select 'STAGING.STG_HERSHA_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HERSHA_ACCOUNTS
+union all
+select 'STAGING.STG_HERSHA_GL_ACTUAL' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HERSHA_GL_ACTUAL
+union all
+select 'STAGING.STG_HERSHA_GL_STAT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HERSHA_GL_STAT
+union all
+select 'STAGING.STG_HHG_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_ACCOUNTS
+union all
+select 'STAGING.STG_HHG_CLUB_LIST' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_CLUB_LIST
+union all
+select 'STAGING.STG_HHG_FORECAST_ANAPLAN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_FORECAST_ANAPLAN
+union all
+select 'STAGING.STG_HHG_REFERENCES' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_REFERENCES
+union all
+select 'STAGING.STG_HHG_ROUNDS_DETAIL' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_ROUNDS_DETAIL
+union all
+select 'STAGING.STG_HHG_TR12_DATA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_TR12_DATA
+union all
+select 'TRANSFORMATION.XFRM_HERSHA_BALANCE_SHEET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HERSHA_BALANCE_SHEET
+union all
+select 'TRANSFORMATION.XFRM_HERSHA_INCOME_STATEMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HERSHA_INCOME_STATEMENT
+union all
+select 'TRANSFORMATION.XFRM_HERSHA_OPERATING_METRICS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HERSHA_OPERATING_METRICS
+union all
+select 'TRANSFORMATION.XFRM_HERSHA_PACING' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HERSHA_PACING
+union all
+select 'TRANSFORMATION.XFRM_HERSHA_UNKNOWN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HERSHA_UNKNOWN
+union all
+select 'TRANSFORMATION.XFRM_HHG_BALANCE_SHEET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HHG_BALANCE_SHEET
+union all
+select 'TRANSFORMATION.XFRM_HHG_INCOME_STATEMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HHG_INCOME_STATEMENT
+union all
+select 'TRANSFORMATION.XFRM_HHG_OPERATING_METRICS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HHG_OPERATING_METRICS
+union all
+select 'TRANSFORMATION.XFRM_HHG_PACING' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HHG_PACING
+union all
+select 'TRANSFORMATION.XFRM_HHG_UNKNOWN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_HHG_UNKNOWN
+union all
+select 'XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION HERSHA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION where source_lane = 'HERSHA'
+union all
+select 'XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION HHG' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION where source_lane = 'HHG'
+union all
+select 'STAGING.STG_HERSHA_TB_ACTUAL' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HERSHA_TB_ACTUAL
+union all
+select 'STAGING.STG_HHG_ASSET_CODES' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_ASSET_CODES
+union all
+select 'STAGING.STG_HHG_CHART_OF_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_CHART_OF_ACCOUNTS
+union all
+select 'STAGING.STG_HHG_DEPARTMENT_KEY' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_DEPARTMENT_KEY
+union all
+select 'STAGING.STG_HHG_TR12_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_HHG_TR12_ACCOUNTS
+union all
+select 'STAGING.STG_ALTERRA_MONTHLY_FINANCIALS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_ALTERRA_MONTHLY_FINANCIALS
+union all
+select 'STAGING.STG_ALTERRA_PACE_BY_STAY_MONTH' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_ALTERRA_PACE_BY_STAY_MONTH
+union all
+select 'STAGING.STG_ALTERRA_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_ALTERRA_ACCOUNTS
+union all
+select 'XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION ALTERRA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION where source_lane = 'ALTERRA'
+union all
+select 'TRANSFORMATION.XFRM_ALTERRA_INCOME_STATEMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ALTERRA_INCOME_STATEMENT
+union all
+select 'TRANSFORMATION.XFRM_ALTERRA_BALANCE_SHEET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ALTERRA_BALANCE_SHEET
+union all
+select 'TRANSFORMATION.XFRM_ALTERRA_OPERATING_METRICS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ALTERRA_OPERATING_METRICS
+union all
+select 'TRANSFORMATION.XFRM_ALTERRA_PACING' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ALTERRA_PACING
+union all
+select 'TRANSFORMATION.XFRM_ALTERRA_UNKNOWN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ALTERRA_UNKNOWN
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL ALTERRA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL where source_lane = 'ALTERRA'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET ALTERRA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET where source_lane = 'ALTERRA'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST ALTERRA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST where source_lane = 'ALTERRA'
+union all
+select 'SEMANTIC.SEM_AI_BALANCE_SHEET ALTERRA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_BALANCE_SHEET where source_lane = 'ALTERRA'
+union all
+select 'SEMANTIC.SEM_AI_OPERATING_METRICS ALTERRA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS where source_lane = 'ALTERRA'
+union all
+select 'SEMANTIC.SEM_AI_UNKNOWN ALTERRA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_UNKNOWN where source_lane = 'ALTERRA'
+union all
+select 'STAGING.STG_ATLANTIC_AVIATION_OC_DATA' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_ATLANTIC_AVIATION_OC_DATA
+union all
+select 'STAGING.STG_ATLANTIC_AVIATION_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_ATLANTIC_AVIATION_ACCOUNTS
+union all
+select 'STAGING.STG_JW_VENICE_FCAST_ACT_FORECAST' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_ACT_FORECAST
+union all
+select 'STAGING.STG_JW_VENICE_FCAST_BY_PERIOD' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_BY_PERIOD
+union all
+select 'STAGING.STG_JW_VENICE_FTE' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_JW_VENICE_FTE
+union all
+select 'STAGING.STG_JW_VENICE_HEADCOUNT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_JW_VENICE_HEADCOUNT
+union all
+select 'STAGING.STG_JW_VENICE_ACCOUNTS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_JW_VENICE_ACCOUNTS
+union all
+select 'XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION ATLANTIC_AVIATION' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION where source_lane = 'ATLANTIC_AVIATION'
+union all
+select 'XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION JW_VENICE' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'LAST_SEEN_RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION where source_lane = 'JW_VENICE'
+union all
+select 'TRANSFORMATION.XFRM_ATLANTIC_AVIATION_INCOME_STATEMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ATLANTIC_AVIATION_INCOME_STATEMENT
+union all
+select 'TRANSFORMATION.XFRM_ATLANTIC_AVIATION_BALANCE_SHEET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ATLANTIC_AVIATION_BALANCE_SHEET
+union all
+select 'TRANSFORMATION.XFRM_ATLANTIC_AVIATION_OPERATING_METRICS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ATLANTIC_AVIATION_OPERATING_METRICS
+union all
+select 'TRANSFORMATION.XFRM_ATLANTIC_AVIATION_PACING' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ATLANTIC_AVIATION_PACING
+union all
+select 'TRANSFORMATION.XFRM_ATLANTIC_AVIATION_UNKNOWN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_ATLANTIC_AVIATION_UNKNOWN
+union all
+select 'TRANSFORMATION.XFRM_JW_VENICE_INCOME_STATEMENT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_JW_VENICE_INCOME_STATEMENT
+union all
+select 'TRANSFORMATION.XFRM_JW_VENICE_BALANCE_SHEET' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_JW_VENICE_BALANCE_SHEET
+union all
+select 'TRANSFORMATION.XFRM_JW_VENICE_OPERATING_METRICS' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_JW_VENICE_OPERATING_METRICS
+union all
+select 'TRANSFORMATION.XFRM_JW_VENICE_PACING' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_JW_VENICE_PACING
+union all
+select 'TRANSFORMATION.XFRM_JW_VENICE_UNKNOWN' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.TRANSFORMATION.XFRM_JW_VENICE_UNKNOWN
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL ATLANTIC_AVIATION' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL where source_lane = 'ATLANTIC_AVIATION'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL JW_VENICE' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_ACTUAL where source_lane = 'JW_VENICE'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET ATLANTIC_AVIATION' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET where source_lane = 'ATLANTIC_AVIATION'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET JW_VENICE' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_BUDGET where source_lane = 'JW_VENICE'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST ATLANTIC_AVIATION' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST where source_lane = 'ATLANTIC_AVIATION'
+union all
+select 'SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST JW_VENICE' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_INCOME_STATEMENT_FORECAST where source_lane = 'JW_VENICE'
+union all
+select 'SEMANTIC.SEM_AI_BALANCE_SHEET ATLANTIC_AVIATION' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_BALANCE_SHEET where source_lane = 'ATLANTIC_AVIATION'
+union all
+select 'SEMANTIC.SEM_AI_BALANCE_SHEET JW_VENICE' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_BALANCE_SHEET where source_lane = 'JW_VENICE'
+union all
+select 'SEMANTIC.SEM_AI_OPERATING_METRICS ATLANTIC_AVIATION' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS where source_lane = 'ATLANTIC_AVIATION'
+union all
+select 'SEMANTIC.SEM_AI_OPERATING_METRICS JW_VENICE' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS where source_lane = 'JW_VENICE'
+union all
+select 'SEMANTIC.SEM_AI_UNKNOWN ATLANTIC_AVIATION' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_UNKNOWN where source_lane = 'ATLANTIC_AVIATION'
+union all
+select 'SEMANTIC.SEM_AI_UNKNOWN JW_VENICE' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.SEMANTIC.SEM_AI_UNKNOWN where source_lane = 'JW_VENICE'
+union all
+select 'STAGING.STG_JW_VENICE_MONTHLY_PL_DEPT' as obj, count(*) as row_count, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID')) as content_hash, hash_agg(object_delete(object_construct_keep_null(*), 'RUN_ID', 'CURRENCY_CODE')) as rest_hash from DEV_G2M_AI.STAGING.STG_JW_VENICE_MONTHLY_PL_DEPT;

@@ -17,6 +17,8 @@ $$
 -- ASSET_NAME: the fact's SITE_NAME; where that is null, STG_PEREGRINE_RESORTS_SITES on an
 -- exact SITE_TAG match (unique there), named in ASSET_NAME_SOURCE (owner Q-13).
 -- STG_PEREGRINE_RESORTS_SITES is built first by the lane's MAIN.
+-- IS_SUBTOTAL (build 13, D-44): a no-account row on a COA calculated line,
+-- except the lines that failed the Q-16 tie test (owner Q-02, Q-07, Q-08).
 -- SCENARIO: the source names none; the table name without schema (D-45).
 -- ============================================================================
 declare
@@ -57,16 +59,30 @@ begin
         from DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_DEPARTMENTS d
     )
     -- ------------------------------------------------------------------------
-    -- COA total flag, one row per tag: the tag is a COA total line, and whether
-    -- any COA row of the tag carries an account or a stat account
-    -- (owner Q-05, Q-08, build 04)
+    -- COA calculated-line flag, one row per tag (build 13, owner Q-02, Q-07,
+    -- Q-08): IS_CALCULATED_LINE, whether any COA row of the tag carries an
+    -- account or a stat account, and the BUD_FORMULA kind ('formula': a +/- list
+    -- or single reference naming at least one line; a constant such as '0' is
+    -- an expression). The tags listed in
+    -- q16_fail failed the Q-16 tie test at M1 (members within 1% in under 95%
+    -- of site-months) and are not subtotals.
     -- ------------------------------------------------------------------------
     , tot as (
         select
               nullif(trim(coa.tag), '')                                     as tag
-            , boolor_agg(coalesce(coa.is_total_line, false))                as coa_total
+            , boolor_agg(coalesce(coa.is_calculated_line, false))           as coa_calc
             , count_if(nullif(trim(coa.account_number), '') is not null
                     or nullif(trim(coa.stat_acct_number), '') is not null) = 0 as coa_no_account
+            , case
+                  when min(nullif(trim(coa.bud_formula), '')) is null then 'no formula'
+                  when min(nullif(trim(coa.bud_formula), '')) = '=TOT' then '=TOT'
+                  when regexp_like(min(nullif(trim(coa.bud_formula), '')), '[A-Za-z0-9]+([+-][A-Za-z0-9]+)*')
+                   and regexp_like(min(nullif(trim(coa.bud_formula), '')), '.*[A-Za-z].*') then 'formula'
+                  else 'expression'
+              end                                                           as formula_kind
+            , nullif(trim(coa.tag), '') in (
+                    'RF0009'
+              )                                                             as q16_fail
         from CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_COA coa
         group by 1
     )
@@ -105,20 +121,22 @@ begin
         , 'CUR_PROFITSWORD_PEREGRINE_DAILY_EXTENDED'::varchar                 as scenario
         , cln.amt::float                                                        as source_amount
         , cln.stat::float                                                       as stat_value
-        , (coalesce(cln.c_item like 'TOT%', false)
-            or coalesce(tot.coa_total and tot.coa_no_account, false))::boolean  as is_subtotal
+        , (cln.c_acct is null and cln.c_stat is null
+            and coalesce(tot.coa_calc, false) and not coalesce(tot.q16_fail, false))::boolean as is_subtotal
         , case
-              when cln.c_item like 'TOT%'
-                  then 'ITEM_TAG prefix TOT: source rollup (owner Q-05)'
-              when tot.coa_total and tot.coa_no_account
-                  then 'COA IS_TOTAL_LINE, tag carries no account: source rollup (owner Q-05, Q-08)'
-              when tot.coa_total
-                  then 'COA IS_TOTAL_LINE on account-coded detail: unflagged (owner Q-08)'
-              when left(cln.c_item, 2) = 'RF'
-                  then 'ITEM_TAG prefix RF: borderline, unflagged (owner Q-05)'
-              when left(cln.c_item, 3) in ('DVR', 'CFL', 'SEQ')
-                  then 'ITEM_TAG prefix ' || left(cln.c_item, 3) || ': borderline, unflagged (owner Q-05)'
-              else 'ITEM_TAG not a rollup prefix'
+              when cln.c_acct is not null or cln.c_stat is not null
+                  then 'account or stat account present: detail'
+              when tot.coa_calc and tot.q16_fail
+                  then 'COA calculated line, fails the Q-16 tie test: unflagged (owner Q-02, Q-08)'
+              when tot.coa_calc and tot.formula_kind = 'formula'
+                  then 'COA calculated line, BUD_FORMULA members tie (Q-16 test, M1): source rollup'
+              when tot.coa_calc and tot.formula_kind = '=TOT'
+                  then 'COA calculated line, =TOT (members not stated): source rollup on IS_CALCULATED_LINE (owner Q-02)'
+              when tot.coa_calc
+                  then 'COA calculated line, ' || tot.formula_kind || ': untestable, source rollup on IS_CALCULATED_LINE (owner Q-07)'
+              when tot.tag is null
+                  then 'ITEM_TAG not in COA'
+              else 'COA line not calculated: detail'
           end::varchar                                                          as subtotal_source
         , (coalesce(cln.site_tag, '~BLANK~')
             || '|' || coalesce(to_char(cln.business_date, 'YYYY-MM-DD'), '~BLANK~')

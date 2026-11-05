@@ -68,7 +68,17 @@ begin
 
     if (:P_LANE = 'KSL_SELECT_SERVICE') then
         -- ====================================================================
-        -- LANE KSL_SELECT_SERVICE
+        -- LANE KSL_SELECT_SERVICE (build 01; rebuilt builds 04, 05, 13, D-44)
+        -- Build 13 (owner Q-01, Q-05; D-46 account blocks, char 5-8 of the
+        -- account): 1x Assets; 2x Assets (due-from); 30-38 and 3900-3955
+        -- Liabilities; 3956-3999 Equity; 4x Revenue; 5x COGS; 6x Payroll; 7x
+        -- Operating Expenses; 8704 / 8705 / 8712 / 8720 Below the Line /
+        -- Depreciation & Amortization; other 8x
+        -- Below the Line / Other Income / (Expense); 9x Allocations & Reserves.
+        -- D-44 re-seed: an existing AMOUNT key in a changed block (2x, 3x, the
+        -- D&A accounts) whose stored classification differs from
+        -- this mapping is updated in H1-H5, section, balance, sign, unit,
+        -- aggregation and seed source only. Keys never move.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -123,6 +133,8 @@ begin
                     , regexp_like(nullif(trim(ext.account_number), ''), '[0-9]{3}-[0-9]{4}-[0-9]{3}') as acct_ok
                     , regexp_like(nullif(trim(ext.stat_account), ''), '[0-9]{3}-[0-9]{4}-[0-9]{3}')   as stat_ok
                     , try_to_number(substr(nullif(trim(ext.account_number), ''), 5, 1))           as digit
+                    , substr(nullif(trim(ext.account_number), ''), 5, 4)                          as main4
+                    , substr(nullif(trim(ext.account_number), ''), 5, 2)                          as blk2
                 from ext
             )
             , cls as (
@@ -144,12 +156,14 @@ begin
                           when k_rtype = 'STATISTIC'             then 'UNCLASSIFIED'
                           when c_acct is null or not acct_ok     then 'UNCLASSIFIED'
                           when digit = 1                         then 'Assets'
-                          when digit = 2                         then 'Liabilities'
-                          when digit = 3                         then 'Equity'
+                          when digit = 2                         then 'Assets'
+                          when digit = 3 and main4 between '3956' and '3999' then 'Equity'
+                          when digit = 3                         then 'Liabilities'
                           when digit = 4                         then 'Revenue'
                           when digit = 5                         then 'Cost of Goods Sold'
                           when digit = 6                         then 'Payroll'
                           when digit = 7                         then 'Operating Expenses'
+                          when main4 in ('8704', '8705', '8712', '8720') then 'Depreciation & Amortization'
                           when digit = 8                         then 'Other Income / (Expense)'
                           else 'UNCLASSIFIED'
                       end as h2
@@ -158,6 +172,10 @@ begin
                           when k_rtype = 'STATISTIC'             then 'RECORD_TYPE STATISTIC; STAT_ACCOUNT malformed, no family (Q-12)'
                           when c_acct is null                    then 'no ACCOUNT_NUMBER: nothing to derive'
                           when not acct_ok                       then 'ACCOUNT_NUMBER malformed: not repaired (Q-12)'
+                          when digit = 2                         then 'block 2x due-from: Assets (owner Q-01, build 13; D-46)'
+                          when digit = 3 and main4 between '3956' and '3999' then 'block 3956-3999: Equity (owner Q-01, build 13; D-46)'
+                          when digit = 3                         then 'block 30-38 / 3900-3955: Liabilities (owner Q-01, build 13; D-46)'
+                          when main4 in ('8704', '8705', '8712', '8720') then 'D&A account ' || main4 || ': Depreciation & Amortization (owner Q-01, build 13; D-46)'
                           when digit between 1 and 9             then 'section digit ' || digit || ' (char 5 of ACCOUNT_NUMBER)'
                           else 'section digit ' || coalesce(to_char(digit), 'none') || ': not in digit table'
                       end as seed_source
@@ -175,6 +193,7 @@ begin
                       when 'Cost of Goods Sold'       then 'Gross Profit'
                       when 'Payroll'                  then 'Operating'
                       when 'Operating Expenses'       then 'Operating'
+                      when 'Depreciation & Amortization' then 'Operating'
                       when 'Other Income / (Expense)' then 'Non-Operating'
                   end as p_l_section
                 , case h2
@@ -182,6 +201,7 @@ begin
                       when 'Cost of Goods Sold'       then 'Debit'
                       when 'Payroll'                  then 'Debit'
                       when 'Operating Expenses'       then 'Debit'
+                      when 'Depreciation & Amortization' then 'Debit'
                       when 'Other Income / (Expense)' then 'Mixed'
                   end as normal_balance
                 , case h2
@@ -189,10 +209,13 @@ begin
                       when 'Cost of Goods Sold'       then -1
                       when 'Payroll'                  then -1
                       when 'Operating Expenses'       then -1
+                      when 'Depreciation & Amortization' then -1
                   end::number(2,0) as value_sign
                 , null::varchar as metric_unit
                 , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
                 , seed_source
+                , (k_rtype = 'AMOUNT' and acct_ok
+                   and (digit in (2, 3) or main4 in ('8704', '8705', '8712', '8720'))) as reseed_block
             from cls
         ) src
             on  tgt.source_lane      = src.k_lane
@@ -200,6 +223,25 @@ begin
             and tgt.department       = src.k_dept
             and tgt.account_key      = src.k_acct
             and tgt.record_type      = src.k_rtype
+        -- D-44 re-seed (owner Q-01, Q-05, build 13): changed blocks only, and only
+        -- where the stored classification differs from the approved mapping
+        when matched and src.reseed_block
+                     and (tgt.h1 is distinct from src.h1 or tgt.h2 is distinct from src.h2
+                          or tgt.p_l_section is distinct from src.p_l_section
+                          or tgt.normal_balance is distinct from src.normal_balance
+                          or tgt.value_sign is distinct from src.value_sign) then update set
+              tgt.h1               = src.h1
+            , tgt.h2               = src.h2
+            , tgt.h3               = src.h3
+            , tgt.h4               = src.h4
+            , tgt.h5               = src.h5
+            , tgt.p_l_section      = src.p_l_section
+            , tgt.normal_balance   = src.normal_balance
+            , tgt.value_sign       = src.value_sign
+            , tgt.metric_unit      = src.metric_unit
+            , tgt.aggregation_type = src.aggregation_type
+            , tgt.seed_source      = src.seed_source
+            , tgt.last_seen_run_id = :P_RUN_ID
         when matched then update set
               tgt.last_seen_run_id = :P_RUN_ID
         when not matched then insert (
@@ -218,7 +260,17 @@ begin
 
     elseif (:P_LANE = 'PEREGRINE_RESORTS') then
         -- ====================================================================
-        -- LANE PEREGRINE_RESORTS
+        -- LANE PEREGRINE_RESORTS (build 01; rebuilt builds 04, 05, 13, D-44)
+        -- Build 13 (owner Q-01, Q-05; D-46 account blocks, char 5-8 of the
+        -- account): 1x Assets; 2x Assets (due-from); 30-38 and 3900-3955
+        -- Liabilities; 3956-3999 Equity; 4x Revenue; 5x COGS; 6x Payroll; 7x
+        -- Operating Expenses; 8704 / 8705 / 8712 / 8720 Below the Line /
+        -- Depreciation & Amortization; 86xx Expense / Operating Expenses; other 8x
+        -- Below the Line / Other Income / (Expense); 9x Allocations & Reserves.
+        -- D-44 re-seed: an existing AMOUNT key in a changed block (2x, 3x, the
+        -- D&A accounts, 86xx) whose stored classification differs from
+        -- this mapping is updated in H1-H5, section, balance, sign, unit,
+        -- aggregation and seed source only. Keys never move.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -273,6 +325,8 @@ begin
                     , regexp_like(nullif(trim(ext.account_number), ''), '[0-9]{3}-[0-9]{4}-[0-9]{3}') as acct_ok
                     , regexp_like(nullif(trim(ext.stat_account), ''), '[0-9]{3}-[0-9]{4}-[0-9]{3}')   as stat_ok
                     , try_to_number(substr(nullif(trim(ext.account_number), ''), 5, 1))           as digit
+                    , substr(nullif(trim(ext.account_number), ''), 5, 4)                          as main4
+                    , substr(nullif(trim(ext.account_number), ''), 5, 2)                          as blk2
                 from ext
             )
             , cls as (
@@ -283,6 +337,7 @@ begin
                           when c_acct is null                   then 'Unclassified'
                           when not acct_ok                      then 'Unclassified'
                           when digit in (1, 2, 3)               then 'Balance Sheet'
+                          when digit = 8 and blk2 = '86'          then 'Expense'
                           when digit = 4                        then 'Revenue'
                           when digit in (5, 6, 7)               then 'Expense'
                           when digit = 8                        then 'Below the Line'
@@ -294,12 +349,15 @@ begin
                           when k_rtype = 'STATISTIC'             then 'UNCLASSIFIED'
                           when c_acct is null or not acct_ok     then 'UNCLASSIFIED'
                           when digit = 1                         then 'Assets'
-                          when digit = 2                         then 'Liabilities'
-                          when digit = 3                         then 'Equity'
+                          when digit = 2                         then 'Assets'
+                          when digit = 3 and main4 between '3956' and '3999' then 'Equity'
+                          when digit = 3                         then 'Liabilities'
                           when digit = 4                         then 'Revenue'
                           when digit = 5                         then 'Cost of Goods Sold'
                           when digit = 6                         then 'Payroll'
                           when digit = 7                         then 'Operating Expenses'
+                          when main4 in ('8704', '8705', '8712', '8720') then 'Depreciation & Amortization'
+                          when digit = 8 and blk2 = '86'         then 'Operating Expenses'
                           when digit = 8                         then 'Other Income / (Expense)'
                           else 'UNCLASSIFIED'
                       end as h2
@@ -308,6 +366,11 @@ begin
                           when k_rtype = 'STATISTIC'             then 'RECORD_TYPE STATISTIC; STAT_ACCOUNT malformed, no family (Q-12)'
                           when c_acct is null                    then 'no ACCOUNT_NUMBER: nothing to derive'
                           when not acct_ok                       then 'ACCOUNT_NUMBER malformed: not repaired (Q-12)'
+                          when digit = 2                         then 'block 2x due-from: Assets (owner Q-01, build 13; D-46)'
+                          when digit = 3 and main4 between '3956' and '3999' then 'block 3956-3999: Equity (owner Q-01, build 13; D-46)'
+                          when digit = 3                         then 'block 30-38 / 3900-3955: Liabilities (owner Q-01, build 13; D-46)'
+                          when main4 in ('8704', '8705', '8712', '8720') then 'D&A account ' || main4 || ': Depreciation & Amortization (owner Q-01, build 13; D-46)'
+                          when digit = 8 and blk2 = '86'         then 'block 86: Operating Expenses (owner Q-05, build 13; D-46)'
                           when digit between 1 and 9             then 'section digit ' || digit || ' (char 5 of ACCOUNT_NUMBER)'
                           else 'section digit ' || coalesce(to_char(digit), 'none') || ': not in digit table'
                       end as seed_source
@@ -325,6 +388,7 @@ begin
                       when 'Cost of Goods Sold'       then 'Gross Profit'
                       when 'Payroll'                  then 'Operating'
                       when 'Operating Expenses'       then 'Operating'
+                      when 'Depreciation & Amortization' then 'Operating'
                       when 'Other Income / (Expense)' then 'Non-Operating'
                   end as p_l_section
                 , case h2
@@ -332,6 +396,7 @@ begin
                       when 'Cost of Goods Sold'       then 'Debit'
                       when 'Payroll'                  then 'Debit'
                       when 'Operating Expenses'       then 'Debit'
+                      when 'Depreciation & Amortization' then 'Debit'
                       when 'Other Income / (Expense)' then 'Mixed'
                   end as normal_balance
                 , case h2
@@ -339,10 +404,13 @@ begin
                       when 'Cost of Goods Sold'       then -1
                       when 'Payroll'                  then -1
                       when 'Operating Expenses'       then -1
+                      when 'Depreciation & Amortization' then -1
                   end::number(2,0) as value_sign
                 , null::varchar as metric_unit
                 , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
                 , seed_source
+                , (k_rtype = 'AMOUNT' and acct_ok
+                   and (digit in (2, 3) or main4 in ('8704', '8705', '8712', '8720') or (digit = 8 and blk2 = '86'))) as reseed_block
             from cls
         ) src
             on  tgt.source_lane      = src.k_lane
@@ -350,6 +418,25 @@ begin
             and tgt.department       = src.k_dept
             and tgt.account_key      = src.k_acct
             and tgt.record_type      = src.k_rtype
+        -- D-44 re-seed (owner Q-01, Q-05, build 13): changed blocks only, and only
+        -- where the stored classification differs from the approved mapping
+        when matched and src.reseed_block
+                     and (tgt.h1 is distinct from src.h1 or tgt.h2 is distinct from src.h2
+                          or tgt.p_l_section is distinct from src.p_l_section
+                          or tgt.normal_balance is distinct from src.normal_balance
+                          or tgt.value_sign is distinct from src.value_sign) then update set
+              tgt.h1               = src.h1
+            , tgt.h2               = src.h2
+            , tgt.h3               = src.h3
+            , tgt.h4               = src.h4
+            , tgt.h5               = src.h5
+            , tgt.p_l_section      = src.p_l_section
+            , tgt.normal_balance   = src.normal_balance
+            , tgt.value_sign       = src.value_sign
+            , tgt.metric_unit      = src.metric_unit
+            , tgt.aggregation_type = src.aggregation_type
+            , tgt.seed_source      = src.seed_source
+            , tgt.last_seen_run_id = :P_RUN_ID
         when matched then update set
               tgt.last_seen_run_id = :P_RUN_ID
         when not matched then insert (

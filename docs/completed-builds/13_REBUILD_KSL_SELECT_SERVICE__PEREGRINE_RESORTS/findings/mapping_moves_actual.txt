@@ -1,0 +1,25 @@
+21 row(s) returned.
+
+SOURCE_LANE,OLD_H,NEW_H,Y,N,AMT,NEW_VALUE
+
+KSL_SELECT_SERVICE,Balance Sheet / Equity,Balance Sheet / Liabilities,2024,84511,-88599441.95,NULL
+KSL_SELECT_SERVICE,Balance Sheet / Equity,Balance Sheet / Liabilities,2025,208855,-221188028.23,NULL
+KSL_SELECT_SERVICE,Balance Sheet / Equity,Balance Sheet / Liabilities,2026,183906,-126860985.7,NULL
+KSL_SELECT_SERVICE,Balance Sheet / Liabilities,Balance Sheet / Assets,2024,318,39209333.98,NULL
+KSL_SELECT_SERVICE,Balance Sheet / Liabilities,Balance Sheet / Assets,2025,195,-13594862.32,NULL
+KSL_SELECT_SERVICE,Balance Sheet / Liabilities,Balance Sheet / Assets,2026,1463,2061322.44,NULL
+KSL_SELECT_SERVICE,Below the Line / Other Income / (Expense),Below the Line / Depreciation & Amortization,2024,710,30400742.24,-30400742.24
+KSL_SELECT_SERVICE,Below the Line / Other Income / (Expense),Below the Line / Depreciation & Amortization,2025,750,29565956.7,-29565956.7
+KSL_SELECT_SERVICE,Below the Line / Other Income / (Expense),Below the Line / Depreciation & Amortization,2026,957,18775940.1,-18775940.1
+PEREGRINE_RESORTS,Balance Sheet / Equity,Balance Sheet / Liabilities,2024,357,834600902.06,NULL
+PEREGRINE_RESORTS,Balance Sheet / Equity,Balance Sheet / Liabilities,2025,32376,182929617.2,NULL
+PEREGRINE_RESORTS,Balance Sheet / Equity,Balance Sheet / Liabilities,2026,37742,-4238923.05,NULL
+PEREGRINE_RESORTS,Balance Sheet / Liabilities,Balance Sheet / Assets,2024,16,522319033.12,NULL
+PEREGRINE_RESORTS,Balance Sheet / Liabilities,Balance Sheet / Assets,2025,398,-212073796.12,NULL
+PEREGRINE_RESORTS,Balance Sheet / Liabilities,Balance Sheet / Assets,2026,183,956699.86,NULL
+PEREGRINE_RESORTS,Below the Line / Other Income / (Expense),Below the Line / Depreciation & Amortization,2024,24,4008500.88,-4008500.88
+PEREGRINE_RESORTS,Below the Line / Other Income / (Expense),Below the Line / Depreciation & Amortization,2025,36,69364380.24,-69364380.24
+PEREGRINE_RESORTS,Below the Line / Other Income / (Expense),Below the Line / Depreciation & Amortization,2026,20,3340417.4,-3340417.4
+PEREGRINE_RESORTS,Below the Line / Other Income / (Expense),Expense / Operating Expenses,2024,98,86168768.92,-86168768.92
+PEREGRINE_RESORTS,Below the Line / Other Income / (Expense),Expense / Operating Expenses,2025,288,139046358.19,-139046358.19
+PEREGRINE_RESORTS,Below the Line / Other Income / (Expense),Expense / Operating Expenses,2026,291,83998404.96,-83998404.96
