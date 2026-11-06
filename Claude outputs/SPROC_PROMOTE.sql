@@ -15,9 +15,11 @@
 -- What it rewrites in each body:
 --   - every qualified '<FROM>.' reference becomes '<TO>.'
 --   - from DEV_G2M_AI only: each SPROC_XFRM_{LANE} classification CTE is
---     pointed at CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY. Every lane proc must
---     swap exactly once. From any other source the procs must already read
---     the master, so a build-table reference there is an error.
+--     pointed at CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY. Every lane proc that
+--     names a classification table must swap exactly once; a proc that names
+--     none (pacing-only lane) is counted separately and needs no swap.
+--     From any other source the procs must already read the master, so a
+--     build-table reference there is an error.
 --
 -- Usage (FROM and TO are required; the result echoes both):
 --   call CLN.UTIL.SPROC_PROMOTE('DEV_G2M_AI', 'DEV1', true);   -- dry run
@@ -43,6 +45,7 @@ declare
     v_done      integer default 0;
     v_lane_xfrm integer default 0;
     v_swaps     integer default 0;
+    v_no_class  integer default 0;
     v_after     integer default 0;
     v_log       varchar default '';
     e_path   exception (-20001, 'SPROC_PROMOTE: path not allowed. Allowed: DEV_G2M_AI->DEV1, DEV_G2M_AI->DEV2, DEV1->TEST, TEST->PROD.');
@@ -97,8 +100,14 @@ begin
         v_ddl := (select get_ddl('procedure', :v_sig, true));
 
         -- classification CTE (transformation lane procedures only)
+        -- a lane proc that names no classification table at all (pacing-only lane)
+        -- is counted separately; any proc that names one must swap exactly once
         if (r.procedure_schema = 'TRANSFORMATION' and not endswith(r.procedure_name, '_MAIN')) then
-            v_lane_xfrm := v_lane_xfrm + 1;
+            if (regexp_count(v_ddl, 'XREF_ACCOUNT_CLASSIFICATION|KSL_MASTER_ACCOUNT_HIERARCHY', 1, 'i') > 0) then
+                v_lane_xfrm := v_lane_xfrm + 1;
+            else
+                v_no_class := v_no_class + 1;
+            end if;
             if (regexp_count(v_ddl, '"?' || v_from || '"?\\.XREF_SNAPSHOT\\.XREF_ACCOUNT_CLASSIFICATION', 1, 'i') > 0) then
                 if (v_from <> 'DEV_G2M_AI') then
                     raise e_xref;
@@ -155,6 +164,7 @@ begin
         || ' FROM ' || v_from || ' TO ' || v_to
         || ': ' || v_done || ' of ' || v_total || ' procedures'
         || ', classification swaps ' || v_swaps || ' of ' || v_lane_xfrm
+        || ', lanes with no classification ' || v_no_class
         || iff(P_DRY_RUN, '', ', verified in target ' || v_after)
         || v_log;
 end;

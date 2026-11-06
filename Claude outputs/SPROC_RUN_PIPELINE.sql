@@ -10,8 +10,12 @@
 --   5 SEMANTIC.SPROC_SEM_AI_MAIN
 --
 -- Lanes come from the master (distinct SOURCE_LANE), the register of every
--- lane this process has promoted. MAIN names are built from those lanes, so
--- no other procedure in the environment is ever called. A lane with none of
+-- lane with classified accounts, plus every SPROC_XREF_{LANE}_MAIN promoted to
+-- this environment (pacing-only lanes have no master keys). XREF MAINs are
+-- this process's own, so other teams' STAGING/TRANSFORMATION lanes in the
+-- same database (e.g. TRUSTYOU) are never picked up. MAIN names are
+-- built from those lanes, so no other procedure in the environment is ever
+-- called. A lane with none of
 -- its three MAINs in this environment is skipped (not promoted here yet) and
 -- listed; a lane with only some of them is an error.
 --
@@ -61,7 +65,12 @@ begin
     -- ------------------------------------------------------------------------
     v_plan_sql :=
            'with lanes as ( '
-        || '  select distinct SOURCE_LANE as lane from CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY ) '
+        || '  select distinct SOURCE_LANE as lane from CLN.XREF.KSL_MASTER_ACCOUNT_HIERARCHY '
+        || '  union '
+        || '  select regexp_substr(procedure_name, ''^SPROC_XREF_(.+)_MAIN$'', 1, 1, ''e'', 1) '
+        || '  from ' || v_db || '.INFORMATION_SCHEMA.PROCEDURES '
+        || '  where procedure_schema = ''XREF_SNAPSHOT'' and argument_signature = ''()'' '
+        || '    and regexp_like(procedure_name, ''^SPROC_XREF_.+_MAIN$'') ) '
         || ', layers as ( '
         || '  select column1 as layer, column2 as schema_name, column3 as pfx '
         || '  from values (1, ''STAGING'', ''STG''), (2, ''XREF_SNAPSHOT'', ''XREF''), (4, ''TRANSFORMATION'', ''XFRM'') ) '
