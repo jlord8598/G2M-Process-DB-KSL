@@ -22,6 +22,8 @@ $$
 -- SCENARIO = the branch's measure column name (D-45). Signs as booked.
 -- SOURCE_LINE_KEY: SECTION|LINE_ITEM|PERIOD_DATE|branch, unique (M1).
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried verbatim.
+-- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
+-- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- ============================================================================
 declare
     v_rows integer;
@@ -86,6 +88,8 @@ begin
         , cln.m_scenario::varchar                                               as scenario
         , iff(cln.c_rtype = 'STATISTIC', null, cln.m_amount)::float             as source_amount
         , iff(cln.c_rtype = 'STATISTIC', cln.m_amount, null)::float             as stat_value
+        , 'PRESENTED'::varchar                                                as source_sign_convention
+        , 'presented-positive: revenue and costs both positive (build 15 M1, D-50)'::varchar as source_sign_convention_source
         , cln.c_subtotal::boolean                                               as is_subtotal
         , cln.c_subtotal_source::varchar                                        as subtotal_source
         , cln.c_line_key::varchar                                              as source_line_key

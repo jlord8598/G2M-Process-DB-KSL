@@ -35,9 +35,13 @@ $$
 --          the first block beats it.
 -- Pacing: the lane has no pacing source (M1); built empty.
 -- SCENARIO is carried verbatim; category never replaces it (D-17).
--- VALUE = SOURCE_AMOUNT * VALUE_SIGN. SOURCE_AMOUNT and STAT_VALUE unchanged.
+-- SOURCE_AMOUNT and STAT_VALUE unchanged.
 -- No filter, no aggregation. The scratch table is dropped before return.
 -- Built from the lane-independent text of SPROC_XFRM_JW_VENICE.
+-- Build 15 (D-50, owner Q-03): VALUE follows the staged SOURCE_SIGN_CONVENTION:
+--   DEBIT -SOURCE_AMOUNT, PROFIT SOURCE_AMOUNT, PRESENTED SOURCE_AMOUNT x
+--   VALUE_SIGN; null wherever VALUE_SIGN is null. This lane: PRESENTED (every table).
+--   SOURCE_SIGN_CONVENTION and its source are carried on every stream.
 -- ============================================================================
 declare
     v_is  integer;
@@ -78,6 +82,7 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , source_sign_convention, source_sign_convention_source
              , false as is_mpd, null::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_ACT_FORECAST
         union all
@@ -85,6 +90,7 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , source_sign_convention, source_sign_convention_source
              , false as is_mpd, null::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_BY_PERIOD
         union all
@@ -92,6 +98,7 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , source_sign_convention, source_sign_convention_source
              , false as is_mpd, null::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_FTE
         union all
@@ -99,6 +106,7 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , source_sign_convention, source_sign_convention_source
              , false as is_mpd, null::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_HEADCOUNT
         union all
@@ -106,6 +114,7 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , source_sign_convention, source_sign_convention_source
              , true as is_mpd, period_type::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_MONTHLY_PL_DEPT
     )
@@ -169,8 +178,15 @@ begin
         , cat.source_line_key::varchar                         as source_line_key
         , cat.source_table::varchar                            as source_table
         , cls.value_sign::number(2,0)                          as value_sign
-        , (cat.source_amount * cls.value_sign)::float          as value
+        , (case
+              when cls.value_sign is null                          then null
+              when cat.source_sign_convention = 'DEBIT'            then -cat.source_amount
+              when cat.source_sign_convention = 'PROFIT'           then cat.source_amount
+              else cat.source_amount * cls.value_sign
+          end)::float                                   as value
         , cls.metric_unit::varchar                             as metric_unit
+        , cat.source_sign_convention::varchar                  as source_sign_convention
+        , cat.source_sign_convention_source::varchar           as source_sign_convention_source
         , cls.aggregation_type::varchar                        as aggregation_type
         , case
               when cat.d48_loses and cls.h1 <> 'Unclassified'       then 'DUPLICATE_DETAIL'
@@ -237,6 +253,7 @@ begin
         , p_l_section, normal_balance, is_subtotal, subtotal_source
         , source_amount, stat_value, source_line_key, source_table
         , value_sign, value, metric_unit, aggregation_type
+        , source_sign_convention, source_sign_convention_source
         , unknown_reason, unresolved_category_value
     from DEV_G2M_AI.TRANSFORMATION.TMP_XFRM_JW_VENICE_ROWS
     where 1=1

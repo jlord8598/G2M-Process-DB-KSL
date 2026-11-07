@@ -19,9 +19,14 @@ $$
 -- IS_SUBTOTAL (owner, stop 1): money lines starting TOTAL or TOT, SECTION
 -- DEPARTMENT PROFIT, and the computed lines GOP ... RETAINED PROFIT/(LOSS).
 -- KEY STATISTICS lines named TOTAL ... are measures, not subtotals.
+-- Build 15 (Q-09): EBITDA EXCLUDING OWNER EXPENSES, this file's spelling of
+-- ACT_FORECAST's EBITDA EXCL. OWNER EXPENSES, equals EBITDA in 24 / 24 periods
+-- (Q-16 tie test): a computed line.
 -- SCENARIO = the branch's measure column name (D-45). Signs as booked.
 -- SOURCE_LINE_KEY: SECTION|LINE_ITEM|PERIOD_DATE|branch, unique (M1).
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried verbatim.
+-- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
+-- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- ============================================================================
 declare
     v_rows integer;
@@ -53,11 +58,12 @@ begin
             , coalesce(unp.section <> 'KEY STATISTICS' and (
                    unp.line_item ilike 'TOTAL%' or unp.line_item ilike 'TOT %'
                 or unp.section = 'DEPARTMENT PROFIT'
-                or unp.line_item in ('GROSS OPERATING PROFIT', 'INCOME BEFORE NON-OP INC/EXP', 'EBITDA EXCL. OWNER EXPENSES', 'EBITDA', 'EBITDA Less REPLACEMENT RESV', 'NET DUE TO/(FROM) OWNER', 'RETAINED PROFIT/(LOSS)')), false) as c_subtotal
+                or unp.line_item in ('GROSS OPERATING PROFIT', 'INCOME BEFORE NON-OP INC/EXP', 'EBITDA EXCL. OWNER EXPENSES', 'EBITDA', 'EBITDA Less REPLACEMENT RESV', 'NET DUE TO/(FROM) OWNER', 'RETAINED PROFIT/(LOSS)', 'EBITDA EXCLUDING OWNER EXPENSES')), false) as c_subtotal
             , (case
                 when unp.section = 'KEY STATISTICS' then 'not a subtotal by the M1 rule'
                 when unp.section = 'DEPARTMENT PROFIT' then 'SECTION DEPARTMENT PROFIT: computed (M1)'
                 when unp.line_item ilike 'TOTAL%' or unp.line_item ilike 'TOT %' then 'LINE_ITEM starts TOTAL (M1)'
+                when unp.line_item = 'EBITDA EXCLUDING OWNER EXPENSES' then 'computed line: equals EBITDA in 24 / 24 periods (Q-16 tie test, build 15 Q-09)'
                 when unp.line_item in ('GROSS OPERATING PROFIT', 'INCOME BEFORE NON-OP INC/EXP', 'EBITDA EXCL. OWNER EXPENSES', 'EBITDA', 'EBITDA Less REPLACEMENT RESV', 'NET DUE TO/(FROM) OWNER', 'RETAINED PROFIT/(LOSS)') then 'computed line (M1)'
                 else 'not a subtotal by the M1 rule' end) as c_subtotal_source
             , (coalesce(unp.section::varchar, '~BLANK~')
@@ -86,6 +92,8 @@ begin
         , cln.m_scenario::varchar                                               as scenario
         , iff(cln.c_rtype = 'STATISTIC', null, cln.m_amount)::float             as source_amount
         , iff(cln.c_rtype = 'STATISTIC', cln.m_amount, null)::float             as stat_value
+        , 'PRESENTED'::varchar                                                as source_sign_convention
+        , 'presented-positive: revenue and costs both positive (build 15 M1, D-50)'::varchar as source_sign_convention_source
         , cln.c_subtotal::boolean                                               as is_subtotal
         , cln.c_subtotal_source::varchar                                        as subtotal_source
         , cln.c_line_key::varchar                                              as source_line_key

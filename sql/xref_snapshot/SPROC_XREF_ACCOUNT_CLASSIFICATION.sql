@@ -456,7 +456,7 @@ begin
     elseif (:P_LANE = 'HHG') then
         -- ====================================================================
         -- LANE HHG (build 02)
-        -- Facts: TR12_DATA, FORECAST_ANAPLAN, ROUNDS_DETAIL.
+        -- Facts: TR12_DATA, FORECAST_ANAPLAN, ROUNDS_DETAIL, BUDGET_BY_CLUB (build 15).
         -- STATISTIC: H1 Statistic first. H2 'ROUNDS_COUNT' (ROUNDS_DETAIL,
         --   the source's column name) or 'STAT_9' (TR12 dept 999, the source's
         --   own section code; no family stated) (D-38, owner Q-01, Q-07).
@@ -473,6 +473,10 @@ begin
         --   Cost of Sales -> COGS; Labor -> Payroll; Operating Expense -> Opex;
         --   Other Income -> Below the Line / OI/E; Below EBITDA -> Below the Line,
         --   H2 D&A (82000, 82100, 82200), Income Taxes (84000), else OI/E.
+        -- Build 15 (owner, stop 1): BUDGET_BY_CLUB added as a fact; its
+        --   ACCOUNT_CODE is TR12's, so it takes the same COA / digit rules. A key
+        --   both tables carry is extracted once (MIN(source_table) = BUDGET_BY_CLUB,
+        --   same rules, same result).
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -495,6 +499,11 @@ begin
                      , asset_name, department_name, account_number, stat_account, account_desc
                      , source_table, stat_unit_family
                 from DEV_G2M_AI.STAGING.STG_HHG_ROUNDS_DETAIL
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , source_table, stat_unit_family
+                from DEV_G2M_AI.STAGING.STG_HHG_BUDGET_BY_CLUB
             )
             -- ----------------------------------------------------------------
             -- extract: one row per five-part key, attributes by MIN()
@@ -590,11 +599,11 @@ begin
                     on  ext.src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
                     and amap.line_item = ext.k_acct
                 left join coa
-                    on  ext.src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA'
+                    on  ext.src_tbl in ('CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA', 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_BUDGET_BY_CLUB')
                     and coa.c_dept = split_part(nullif(trim(ext.account_number), ''), '-', 2)
                     and coa.c_nat  = split_part(nullif(trim(ext.account_number), ''), '-', 3)
                 left join coa_nat
-                    on  ext.src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA'
+                    on  ext.src_tbl in ('CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA', 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_BUDGET_BY_CLUB')
                     and coa_nat.c_nat = split_part(nullif(trim(ext.account_number), ''), '-', 3)
             )
             , prop2 as (
@@ -743,6 +752,9 @@ begin
         --   880430 -> H2 Depreciation & Amortization; 890010 -> Income Taxes. H1 stays
         --   Below the Line (digit, D-46).
         -- BGT / PYACT carry no account: Unclassified (Q-19).
+        -- Build 15 (owner Q-05, N-30): 870215 FF&E Reserve leaves the D&A list:
+        --   H1 Allocations & Reserves, H2 UNCLASSIFIED (no section, sign null, so
+        --   it carries no VALUE), with a guarded D-44 re-seed of the existing key.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -808,6 +820,7 @@ begin
                           when not acct_ok                      then 'Unclassified'
                           when digit = 4                        then 'Revenue'
                           when digit in (5, 6, 7)               then 'Expense'
+                          when acct_ok and seg2 = '870215'      then 'Allocations & Reserves'
                           when digit = 8                        then 'Below the Line'
                           when digit = 9                        then 'Allocations & Reserves'
                           when digit in (1, 2, 3)               then 'Balance Sheet'
@@ -816,7 +829,8 @@ begin
                     , case
                           when k_rtype = 'STATISTIC'             then coalesce(nullif(trim(unit_family), ''), 'UNCLASSIFIED')
                           when c_acct is null or not acct_ok     then 'UNCLASSIFIED'
-                          when seg2 in ('870105', '870110', '870120', '870125', '870205', '870210', '870215', '880430')
+                          when seg2 = '870215'                   then 'UNCLASSIFIED'
+                          when seg2 in ('870105', '870110', '870120', '870125', '870205', '870210', '880430')
                                                                  then 'Depreciation & Amortization'
                           when seg2 = '890010'                   then 'Income Taxes'
                           when digit = 1                         then 'Assets'
@@ -835,7 +849,9 @@ begin
                           when k_rtype = 'STATISTIC'             then 'RECORD_TYPE STATISTIC; no SUBACCOUNT label'
                           when c_acct is null                    then 'no ACCOUNT_NUMBER: nothing to derive (Q-19)'
                           when not acct_ok                       then 'ACCOUNT_NUMBER malformed: not repaired'
-                          when seg2 in ('870105', '870110', '870120', '870125', '870205', '870210', '870215', '880430', '890010')
+                          when seg2 = '870215'
+                              then 'FF&E Reserve funding, not depreciation: Allocations & Reserves (owner, build 15 Q-05; N-30)'
+                          when seg2 in ('870105', '870110', '870120', '870125', '870205', '870210', '880430', '890010')
                               then 'section digit ' || digit || ' (H1); H2 by named account ' || seg2 || ' (owner, build 08 Q-07)'
                           when digit between 1 and 9             then 'section digit ' || digit || ' (char 6 of FULL_ACCOUNT_KEY)'
                           else 'section digit ' || coalesce(to_char(digit), 'none') || ': not in digit table'
@@ -878,6 +894,7 @@ begin
                 , null::varchar as metric_unit
                 , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
                 , seed_source
+                , (k_rtype = 'AMOUNT' and acct_ok and seg2 = '870215') as reseed_block
             from cls
         ) src
             on  tgt.source_lane      = src.k_lane
@@ -885,6 +902,25 @@ begin
             and tgt.department       = src.k_dept
             and tgt.account_key      = src.k_acct
             and tgt.record_type      = src.k_rtype
+        -- D-44 re-seed (owner Q-05, build 15): account 870215 only, and only
+        -- where the stored classification differs from the approved mapping
+        when matched and src.reseed_block
+                     and (tgt.h1 is distinct from src.h1 or tgt.h2 is distinct from src.h2
+                          or tgt.p_l_section is distinct from src.p_l_section
+                          or tgt.normal_balance is distinct from src.normal_balance
+                          or tgt.value_sign is distinct from src.value_sign) then update set
+              tgt.h1               = src.h1
+            , tgt.h2               = src.h2
+            , tgt.h3               = src.h3
+            , tgt.h4               = src.h4
+            , tgt.h5               = src.h5
+            , tgt.p_l_section      = src.p_l_section
+            , tgt.normal_balance   = src.normal_balance
+            , tgt.value_sign       = src.value_sign
+            , tgt.metric_unit      = src.metric_unit
+            , tgt.aggregation_type = src.aggregation_type
+            , tgt.seed_source      = src.seed_source
+            , tgt.last_seen_run_id = :P_RUN_ID
         when matched then update set
               tgt.last_seen_run_id = :P_RUN_ID
         when not matched then insert (
@@ -1986,6 +2022,10 @@ begin
         --   Operating Expenses except 701110 (replacement reserve, below EBITDA)
         --   -> Below the Line / Other Income / (Expense). STATISTIC -> Statistic,
         --   H2 = the line text.
+        -- Build 15 (owner Q-09): FCAST GOP MARGIN (a ratio, GOP / sales) ->
+        --   Statistic, H2 = the source section; FCAST_BY_PERIOD's EBITDA EXCLUDING
+        --   OWNER EXPENSES is a computed line in staging (Q-16 tie test) and takes
+        --   the subtotal rule. Guarded D-44 re-seed of those 3 keys.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -2050,6 +2090,7 @@ begin
                       ext.*
                     , case
                           when m_subtotal                                         then 'UNCLASSIFIED'
+                          when not m_mpd and k_acct = 'GOP MARGIN'                then k_dept
                           when m_mpd and k_rtype = 'STATISTIC'                    then k_acct
                           when m_mpd and m_code = '701110'                        then 'Other Income / (Expense)'
                           when m_mpd and left(m_code, 1) = '3'                    then 'Revenue'
@@ -2074,6 +2115,7 @@ begin
                       cls0.*
                     , case
                           when m_subtotal                       then 'Unclassified'
+                          when not m_mpd and k_acct = 'GOP MARGIN' then 'Statistic'
                           when k_rtype = 'STATISTIC'            then 'Statistic'
                           when h2 = 'Revenue'                   then 'Revenue'
                           when h2 = 'Other Income / (Expense)'  then 'Below the Line'
@@ -2084,6 +2126,7 @@ begin
                       end as h1
                     , case
                           when m_subtotal                       then 'source subtotal or computed line (' || m_subtotal_source || '): SOURCE_ROLLUP, not classified'
+                          when not m_mpd and k_acct = 'GOP MARGIN' then 'GOP MARGIN: a ratio (equals GOP / sales), Statistic; H2 = the source section (build 15 Q-09; RECORD_TYPE AMOUNT as stated)'
                           when m_mpd and k_rtype = 'STATISTIC'  then 'MONTHLY_PL_DEPT RECORD_TYPE STATISTIC; H2 = the line text (D-38; build 12)'
                           when m_mpd and m_code = '701110'      then 'MONTHLY_PL_DEPT 701110 replacement reserve: below EBITDA, Below the Line (owner, build 12 Q-04)'
                           when m_mpd and h2 <> 'UNCLASSIFIED'   then 'MONTHLY_PL_DEPT GL block ' || left(m_code, iff(left(m_code, 1) = '5', 2, 1)) || 'xxxxx: ' || h2 || ' (owner, build 12 Q-04)'
@@ -2126,6 +2169,9 @@ begin
                 , null::varchar as metric_unit
                 , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
                 , seed_source
+                , (not m_mpd and k_rtype = 'AMOUNT'
+                   and (k_acct = 'GOP MARGIN'
+                        or (k_dept = 'UNDISTRIBUTED OPERATING EXP' and k_acct = 'EBITDA EXCLUDING OWNER EXPENSES'))) as reseed_block
             from cls
         ) src
             on  tgt.source_lane      = src.k_lane
@@ -2133,6 +2179,26 @@ begin
             and tgt.department       = src.k_dept
             and tgt.account_key      = src.k_acct
             and tgt.record_type      = src.k_rtype
+        -- D-44 re-seed (owner Q-09, build 15): the FCAST GOP MARGIN keys and
+        -- EBITDA EXCLUDING OWNER EXPENSES only, and only where the stored
+        -- classification differs from the approved mapping
+        when matched and src.reseed_block
+                     and (tgt.h1 is distinct from src.h1 or tgt.h2 is distinct from src.h2
+                          or tgt.p_l_section is distinct from src.p_l_section
+                          or tgt.normal_balance is distinct from src.normal_balance
+                          or tgt.value_sign is distinct from src.value_sign) then update set
+              tgt.h1               = src.h1
+            , tgt.h2               = src.h2
+            , tgt.h3               = src.h3
+            , tgt.h4               = src.h4
+            , tgt.h5               = src.h5
+            , tgt.p_l_section      = src.p_l_section
+            , tgt.normal_balance   = src.normal_balance
+            , tgt.value_sign       = src.value_sign
+            , tgt.metric_unit      = src.metric_unit
+            , tgt.aggregation_type = src.aggregation_type
+            , tgt.seed_source      = src.seed_source
+            , tgt.last_seen_run_id = :P_RUN_ID
         when matched then update set
               tgt.last_seen_run_id = :P_RUN_ID
         when not matched then insert (

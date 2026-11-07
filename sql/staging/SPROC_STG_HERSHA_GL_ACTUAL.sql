@@ -20,6 +20,8 @@ $$
 -- branch; the file path and row are null on a branch whose measure is empty.
 -- SCENARIO = the name of the branch's defining measure column, ACTUAL_AMOUNT or
 -- FORECAST_AMOUNT: the source names no scenario (D-45, build 06 Q-03).
+-- Build 15 (D-50): SOURCE_SIGN_CONVENTION DEBIT for every row, with its evidence
+-- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- ============================================================================
 declare
     v_rows integer;
@@ -61,6 +63,8 @@ begin
         , unp.m_scenario::varchar                                               as scenario
         , unp.m_amount::float as source_amount
         , unp.m_stat::float as stat_value
+        , 'DEBIT'::varchar                                                    as source_sign_convention
+        , 'debit-positive: TB revenue (4xxx) negative in 108 / 108 entity-months, 5xxx-7xxx positive (build 15 M1, D-50)'::varchar as source_sign_convention_source
         , false::boolean                                                        as is_subtotal
         , 'source gives no way to tell'::varchar                                as subtotal_source
         , (coalesce(unp.company_id, '~BLANK~')

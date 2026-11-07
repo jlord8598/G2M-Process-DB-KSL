@@ -18,6 +18,8 @@ $$
 -- code (all 50 clubs present, M1). The 3,650 zero rows dated after the load
 -- are kept (owner Q-07). The source names no scenario; category comes from the
 -- table, so SCENARIO = the table name without schema (D-45, build 06 Q-03).
+-- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
+-- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- ============================================================================
 declare
     v_rows integer;
@@ -72,6 +74,8 @@ begin
         , 'CLN_HERITAGE_GOLF_ROUNDS_DETAIL'::varchar                            as scenario
         , null::float                                                           as source_amount
         , cln.rounds_count::float                                               as stat_value
+        , 'PRESENTED'::varchar                                                as source_sign_convention
+        , 'presented-positive: rounds and revenue as stated (build 15 M1, D-50)'::varchar as source_sign_convention_source
         , false::boolean                                                        as is_subtotal
         , 'source gives no way to tell'::varchar                                as subtotal_source
         , (coalesce(cln.source_file_path, '~BLANK~')

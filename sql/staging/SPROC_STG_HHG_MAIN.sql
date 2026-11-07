@@ -10,6 +10,7 @@ $$
 -- Stamps its own RUN_ID and passes it to every model it calls.
 -- Calls no other MAIN. Catches no exception.
 -- Dictionaries first: TR12 reads STG_HHG_ASSET_CODES (build 10 Q-02).
+-- Build 15: SPROC_STG_HHG_BUDGET_BY_CLUB added (owner, stop 1).
 -- ============================================================================
 declare
     v_run_id varchar default 'RUN_' || to_char(current_timestamp(), 'YYYYMMDD_HH24MISS_FF3');
@@ -56,6 +57,10 @@ begin
     v_models := v_models + 1;
 
     call DEV_G2M_AI.STAGING.SPROC_STG_HHG_FORECAST_ANAPLAN(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_HHG_BUDGET_BY_CLUB(:v_run_id) into :v_r;
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 

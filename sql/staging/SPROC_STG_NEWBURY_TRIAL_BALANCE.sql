@@ -25,6 +25,8 @@ $$
 -- branch where the source gives one, else the measure column name
 -- (FORECAST_AMOUNT); ACTUAL_AMOUNT / BUDGET_AMOUNT on the other branches, which
 -- name no scenario. MEASURE_COLUMN names the branch; category is set at M5.
+-- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
+-- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- ============================================================================
 declare
     v_rows integer;
@@ -96,6 +98,8 @@ begin
         , cln.measure_scenario::varchar                                         as scenario
         , iff(cln.c_vtype = 'STAT', null, cln.measure_value)::float             as source_amount
         , iff(cln.c_vtype = 'STAT', cln.measure_value, null)::float             as stat_value
+        , 'PRESENTED'::varchar                                                as source_sign_convention
+        , 'presented-positive: revenue (4xxx) and costs (5xxx-7xxx) both positive (build 15 M1, D-50)'::varchar as source_sign_convention_source
         , coalesce(cln.node_type <> 'Leaf', false)::boolean                     as is_subtotal
         , ('NODE_TYPE ' || coalesce(cln.node_type, '~BLANK~') || ': subtotal unless Leaf (M1)')::varchar as subtotal_source
         , (coalesce(cln.full_account_key, '~BLANK~')

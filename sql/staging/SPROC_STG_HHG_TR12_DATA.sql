@@ -20,10 +20,14 @@ $$
 -- Department 999 is STATISTIC (owner Q-01): its AMOUNT goes to STAT_VALUE
 -- and SOURCE_AMOUNT is null; on every other row AMOUNT is SOURCE_AMOUNT.
 -- ACCOUNT_DESC, DEPARTMENT_NAME and PARENT_CODE from the lane's ACCOUNTS
--- dictionary on FULL_ACCOUNT_STRING = ACCOUNT_CODE (unique on the whole table;
--- build 08 M1): ACCOUNT_DESCRIPTION, DEPARTMENT_DESCRIPTION as supplied per
+-- dictionary on FULL_ACCOUNT_STRING = ACCOUNT_CODE within its TR12 slice
+-- (SOURCE_TABLE = CLN_HERITAGE_GOLF_TR12_DATA, unique; build 15 M3: the
+-- dictionary now holds one slice per fact table and is no longer unique on
+-- FULL_ACCOUNT_STRING alone): ACCOUNT_DESCRIPTION, DEPARTMENT_DESCRIPTION as supplied per
 -- account, no normalising (build 08 Q-09), PARENT_CODE an unused attribute
 -- (build 08 Q-11). Null where the source supplies none.
+-- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
+-- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- ============================================================================
 declare
     v_rows integer;
@@ -56,6 +60,7 @@ begin
     , acct as (
         select
               a.full_account_string
+            , a.source_table
             , a.account_description
             , a.department_description
             , a.parent_code
@@ -101,6 +106,8 @@ begin
         , cln.scenario::varchar                                                 as scenario
         , iff(cln.c_dept = '999', null, cln.amount)::float                      as source_amount
         , iff(cln.c_dept = '999', cln.amount, null)::float                      as stat_value
+        , 'PRESENTED'::varchar                                                as source_sign_convention
+        , 'presented-positive: revenue and costs both positive (build 15 M1, D-50)'::varchar as source_sign_convention_source
         , false::boolean                                                        as is_subtotal
         , 'source gives no way to tell'::varchar                                as subtotal_source
         , (coalesce(cln.source_file_path, '~BLANK~')
@@ -121,6 +128,7 @@ begin
     from cln
     left join acct
         on  acct.full_account_string = cln.account_code
+        and acct.source_table = 'CLN_HERITAGE_GOLF_TR12_DATA'
     left join refs
         on  refs.club_number = cln.c_site
     where 1=1;

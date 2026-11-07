@@ -18,6 +18,8 @@ $$
 -- this source; carried as booked.
 -- LOCATION '+All Regions' is the sum of the other 52 locations on all 360
 -- cells (M1): IS_SUBTOTAL true there (Q-05).
+-- Build 15 (D-50): SOURCE_SIGN_CONVENTION PROFIT for every row, with its evidence
+-- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- ============================================================================
 declare
     v_rows integer;
@@ -63,6 +65,8 @@ begin
         , cln.scenario::varchar                                                 as scenario
         , cln.amount::float                                                     as source_amount
         , null::float                                                           as stat_value
+        , 'PROFIT'::varchar                                                   as source_sign_convention
+        , 'profit-signed: revenue positive, COGS / Payroll / OpEx negative (build 15 M1, D-50)'::varchar as source_sign_convention_source
         , (cln.location = '+All Regions')::boolean                              as is_subtotal
         , case
               when cln.location = '+All Regions'

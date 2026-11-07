@@ -23,9 +23,18 @@ $$
 -- Pacing: the lane has no pacing or pickup source (M1). XFRM_HHG_PACING is
 -- built empty with RUN_ID, SOURCE_LANE, SOURCE_TABLE so the stream exists.
 -- SCENARIO is carried verbatim; category never replaces it (D-17).
--- VALUE = SOURCE_AMOUNT * VALUE_SIGN. SOURCE_AMOUNT and STAT_VALUE unchanged.
+-- SOURCE_AMOUNT and STAT_VALUE unchanged.
 -- No filter, no aggregation. The scratch table is dropped before return.
 -- Built from the lane-independent text of SPROC_XFRM_PEREGRINE_RESORTS.
+-- Build 15 (D-50, owner Q-03): VALUE follows the staged SOURCE_SIGN_CONVENTION:
+--   DEBIT -SOURCE_AMOUNT, PROFIT SOURCE_AMOUNT, PRESENTED SOURCE_AMOUNT x
+--   VALUE_SIGN; null wherever VALUE_SIGN is null. This lane: PROFIT (FORECAST_ANAPLAN; VALUE = SOURCE_AMOUNT), PRESENTED (TR12_DATA, ROUNDS_DETAIL, BUDGET_BY_CLUB).
+--   SOURCE_SIGN_CONVENTION and its source are carried on every stream.
+-- Build 15: BUDGET_BY_CLUB fact (owner, stop 1), SCENARIO FINAL: Budget Amount
+--   -> BUDGET. D-48 (owner Q-08): within FORECAST_ANAPLAN the latest FILE_DATE
+--   wins per entity + month + scenario; an older file's rows count only for
+--   entity-months the latest file lacks; losers to UNKNOWN as DUPLICATE_DETAIL,
+--   keeping H1-H5.
 -- ============================================================================
 declare
     v_is  integer;
@@ -66,19 +75,29 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table
+             , source_sign_convention, source_sign_convention_source, file_date
         from DEV_G2M_AI.STAGING.STG_HHG_TR12_DATA
         union all
         select source_lane, source_site_code, asset_name, department, department_name
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table
+             , source_sign_convention, source_sign_convention_source, file_date
         from DEV_G2M_AI.STAGING.STG_HHG_FORECAST_ANAPLAN
         union all
         select source_lane, source_site_code, asset_name, department, department_name
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table
+             , source_sign_convention, source_sign_convention_source, file_date
         from DEV_G2M_AI.STAGING.STG_HHG_ROUNDS_DETAIL
+        union all
+        select source_lane, source_site_code, asset_name, department, department_name
+             , account_number, stat_account, account_key, record_type, record_type_source
+             , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
+             , is_subtotal, subtotal_source, source_line_key, source_table
+             , source_sign_convention, source_sign_convention_source, file_date
+        from DEV_G2M_AI.STAGING.STG_HHG_BUDGET_BY_CLUB
     )
     -- ------------------------------------------------------------------------
     -- category, row by row
@@ -95,11 +114,17 @@ begin
                       then 'FORECAST'
                   when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL'
                       then 'ACTUAL'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_BUDGET_BY_CLUB'
+                       and fact.scenario = 'FINAL: Budget Amount'
+                      then 'BUDGET'
               end as category
             , case
                   when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL' then fact.source_table
                   else coalesce(fact.scenario, '~BLANK~')
               end as category_input
+            , (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
+               and fact.file_date < max(iff(fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN', fact.file_date, null))
+                                      over (partition by fact.source_table, fact.source_site_code, fact.period_end, fact.scenario))::boolean as d48_loses
         from fact
         where 1=1
     )
@@ -137,10 +162,18 @@ begin
         , cat.source_line_key::varchar                         as source_line_key
         , cat.source_table::varchar                            as source_table
         , cls.value_sign::number(2,0)                          as value_sign
-        , (cat.source_amount * cls.value_sign)::float          as value
+        , (case
+              when cls.value_sign is null                          then null
+              when cat.source_sign_convention = 'DEBIT'            then -cat.source_amount
+              when cat.source_sign_convention = 'PROFIT'           then cat.source_amount
+              else cat.source_amount * cls.value_sign
+          end)::float                                   as value
         , cls.metric_unit::varchar                             as metric_unit
+        , cat.source_sign_convention::varchar                  as source_sign_convention
+        , cat.source_sign_convention_source::varchar           as source_sign_convention_source
         , cls.aggregation_type::varchar                        as aggregation_type
         , case
+              when cat.d48_loses                                    then 'DUPLICATE_DETAIL'
               when cls.h1 = 'Unclassified' and cat.category is null then 'BOTH'
               when cls.h1 = 'Unclassified'                          then 'UNCLASSIFIED_ACCOUNT'
               when cat.category is null                             then 'UNRESOLVED_CATEGORY'
@@ -203,6 +236,7 @@ begin
         , p_l_section, normal_balance, is_subtotal, subtotal_source
         , source_amount, stat_value, source_line_key, source_table
         , value_sign, value, metric_unit, aggregation_type
+        , source_sign_convention, source_sign_convention_source
         , unknown_reason, unresolved_category_value
     from DEV_G2M_AI.TRANSFORMATION.TMP_XFRM_HHG_ROWS
     where 1=1

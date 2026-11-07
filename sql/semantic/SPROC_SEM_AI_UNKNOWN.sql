@@ -14,7 +14,8 @@ $$
 -- CATEGORY and H1-H5 arrive as transformation left them: null only where
 -- they did not resolve.
 -- CURRENCY_CODE (build 12, owner Q-06 / Q-10): a per-lane literal after
--- SOURCE_AMOUNT; BEAUMIER MIXED (N-19), ALTERRA UNCONFIRMED (N-18).
+-- SOURCE_AMOUNT; BEAUMIER per hotel from XFRM_BEAUMIER_* (build 15 Q-06, N-19
+-- closed), ALTERRA UNCONFIRMED (N-18).
 -- Build 14: UNDER_CANVAS block added (USD, owner Q-03). THE_PIG and OUTRIGGER
 -- are pacing-only lanes: no semantic block (D-24, owner Q-06).
 -- ============================================================================
@@ -290,7 +291,7 @@ begin
         , is_subtotal::boolean               as is_subtotal
         , subtotal_source::varchar           as subtotal_source
         , source_amount::float               as source_amount
-        , 'MIXED'::varchar                   as currency_code
+        , currency_code::varchar             as currency_code
         , stat_value::float                  as stat_value
         , source_line_key::varchar           as source_line_key
         , source_table::varchar              as source_table

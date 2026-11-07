@@ -18,6 +18,8 @@ $$
 -- No account, stat account or line item: ACCOUNT_KEY '~BLANK~'.
 -- Site = HOTEL_ID as written (owner Q-11).
 -- SCENARIO verbatim.
+-- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
+-- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- ============================================================================
 declare
     v_rows integer;
@@ -63,6 +65,8 @@ begin
         , cln.scenario::varchar                                                 as scenario
         , cln.revenue::float                                                    as source_amount
         , cln.rooms::float                                                      as stat_value
+        , 'PRESENTED'::varchar                                                as source_sign_convention
+        , 'statistic values as stated; no money sign (build 15 M1, D-50)'::varchar as source_sign_convention_source
         , false::boolean                                                        as is_subtotal
         , 'source gives no way to tell'::varchar                                as subtotal_source
         , (coalesce(cln.source_file_path, '~BLANK~')
