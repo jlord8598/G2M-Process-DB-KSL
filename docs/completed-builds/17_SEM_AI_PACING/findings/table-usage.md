@@ -1,0 +1,16 @@
+# Table usage (build 17)
+
+Read: only `DEV_G2M_AI.TRANSFORMATION.XFRM_<LANE>_PACING`, by `SPROC_SEM_AI_PACING` (every column; metrics into VALUE, the rest into the named columns or ATTRIBUTES). No CLN table is read: 0 of the build's queries on 2026-11-11 touch CLN (M3).
+
+| Stream | Rows | Used |
+|---|---|---|
+| XFRM_ALTERRA_PACING | 24,768 | SPROC_SEM_AI_PACING, lane block ALTERRA |
+| XFRM_BEAUMIER_PACING | 16,995 | SPROC_SEM_AI_PACING, lane block BEAUMIER |
+| XFRM_KSL_SELECT_SERVICE_PACING | 557,049 | SPROC_SEM_AI_PACING, lane block KSL_SELECT_SERVICE |
+| XFRM_NEWBURY_PACING | 272,559 | SPROC_SEM_AI_PACING, lane block NEWBURY |
+| XFRM_OUTRIGGER_PACING | 13,256 | SPROC_SEM_AI_PACING, lane block OUTRIGGER |
+| XFRM_PEREGRINE_RESORTS_PACING | 623,819 | SPROC_SEM_AI_PACING, lane block PEREGRINE_RESORTS |
+| XFRM_THE_PIG_PACING | 5,184 | SPROC_SEM_AI_PACING, lane block THE_PIG |
+| XFRM_UNDER_CANVAS_PACING | 85,488 | SPROC_SEM_AI_PACING, lane block UNDER_CANVAS |
+| XFRM_NEWBURY_PACING: CLN_NEWBURY_BOSTON_OPS_RATE_SHOPS rows | 38,848 | not read into SEM_AI_PACING (Q-03) |
+| XFRM_ATLANTIC_AVIATION / DAVIDSON / HERSHA / HHG / INVITED_CLUBS / JW_VENICE_PACING | 0 | empty; no block (coverage passes while empty, fails once they get rows) |

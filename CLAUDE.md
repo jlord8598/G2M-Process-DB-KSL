@@ -35,8 +35,9 @@ it reconciles.
    unclassified account into a plausible neighbour. `Unclassified` is a value.
 5. **Completeness is a count.** `COUNT(*)`, per lane, exact, at every boundary.
 6. **The classification table is the only classifier.**
-7. **Six tables in `SEMANTIC`**, and nothing else besides the procedures that
-   build them. Drop every scratch object before a procedure returns.
+7. **Seven tables in `SEMANTIC`**: the six detail tables and `SEM_AI_PACING`
+   (D-51), and nothing else besides the procedures that build them. Drop every
+   scratch object before a procedure returns.
 
 ---
 
@@ -287,9 +288,9 @@ week against how it stands today, and the movement between the two. That needs
 an **as-of date distinct from the period it describes**, which no other stream
 in this build carries.
 
-**It stops at transformation.** There is no semantic model, because its grain
-is not the one the six semantic tables share. It is built so the data is not
-lost and so a consumer can reach it, not so it conforms.
+**It reaches semantic only through `SEM_AI_PACING`** (D-51), in its own long
+shape, because its grain is not the one the six detail tables share. Its
+transformation stream keeps the lane's own columns.
 
 **M1 establishes whether pacing is derivable at all**, for each table whose
 name or content suggests it:
@@ -450,6 +451,15 @@ SEM_AI_INCOME_STATEMENT_ACTUAL      SEM_AI_BALANCE_SHEET
 SEM_AI_INCOME_STATEMENT_BUDGET      SEM_AI_OPERATING_METRICS
 SEM_AI_INCOME_STATEMENT_FORECAST    SEM_AI_UNKNOWN
 ```
+
+**A seventh table, `SEM_AI_PACING`, holds every lane's pacing** (D-51). It has
+its own columns, not the common block, because pacing's grain carries a
+snapshot date the six do not. It is long: one row per pacing row and metric
+column. It is outside the fact count identity; its own identity is
+`XFRM_{LANE}_PACING rows x k = SEM_AI_PACING rows`, per source table, with k
+the metric columns that table populates. **Snapshots are never summed
+across:** a sum over it is valid only within one SNAPSHOT_DATE (or
+IS_LATEST_SNAPSHOT), one VANTAGE, one CURRENCY_CODE, and IS_ADDITIVE.
 
 ### One row per source line
 
@@ -629,7 +639,7 @@ nothing about whether the rules got worse.
 
 ### Invariants
 
-**Six tables in `SEMANTIC`, and nothing else besides the procedures that
+**Seven tables in `SEMANTIC`, and nothing else besides the procedures that
 build them.** Drop every temporary table before a procedure returns; a `LOCAL TEMPORARY` table still occupies the schema
 namespace while the session lasts.
 
@@ -1166,8 +1176,13 @@ count(STG) = count(XFRM_IS) + count(XFRM_BS) + count(XFRM_METRICS)
 -- transformation to semantic
 count(XFRM, four streams excluding PACING) = count(SEM, six tables)
 --   the income statement stream fans out to three tables by category;
---   the other three map one to one; PACING has no semantic model and is
---   excluded from this identity but not from the partition above
+--   the other three map one to one; PACING is excluded from this identity
+--   but not from the partition above
+
+-- transformation pacing to SEM_AI_PACING (D-51), per lane and source table
+count(XFRM_{LANE}_PACING rows of a table) x k = count(SEM_AI_PACING rows of it)
+--   k = the metric columns that table populates; and every lane whose
+--   XFRM_{LANE}_PACING has rows has rows in SEM_AI_PACING
 ```
 
 **`COUNT(*)`, never `SUM()`.** A zero-amount row leaves a total unmoved and
@@ -1545,10 +1560,10 @@ and then it changes here, for every build after.
 | D-18 | Statistics | No sign, no `VALUE`. The statistic measure is `STAT_VALUE`; there is no separate metric value column. |
 | D-19 | `AGGREGATION_TYPE` and `METRIC_UNIT` | Stored per classification key, asserted one-per-key by check 2(d). |
 | D-20 | Operating metrics | Its own stream and its own semantic table. |
-| D-21 | Semantic shape | Detail only. Six tables, fixed and identical across lanes and builds. No aggregated layer. **Pacing stops at transformation** and has no semantic model: its grain carries an as-of date the six tables do not. |
+| D-21 | Semantic shape | Detail only. Six detail tables, fixed and identical across lanes and builds, and `SEM_AI_PACING` (D-51). No aggregated layer. **Pacing reaches semantic only through `SEM_AI_PACING`**, in its own long shape: its grain carries a snapshot date the six do not. |
 | D-22 | Completeness | Invariant 5. |
 | D-23 | Transformation procedures | One per lane, five tables from one join, reading the classification in one marked CTE so promotion swaps it in one line. |
-| D-24 | Pacing and pickup | Their own transformation stream, routed on source rather than `H1`, counted in the partition, and ending at transformation with no semantic model. Not `UNKNOWN`, which is a queue that should shrink. M1 establishes whether an as-of date exists; where it does not, the stream is still built and the memo states what the source would need to supply. |
+| D-24 | Pacing and pickup | Their own transformation stream, routed on source rather than `H1`, counted in the partition, and keeping the lane's own columns. It reaches semantic only through `SEM_AI_PACING` (D-51). Not `UNKNOWN`, which is a queue that should shrink. M1 establishes whether an as-of date exists; where it does not, the stream is still built and the memo states what the source would need to supply. |
 | D-25 | Duplicates and subtotals | Kept everywhere. Duplicate extracts are tagged with `SOURCE_TABLE`; the source's own total and rollup rows are tagged with `IS_SUBTOTAL`, set in staging per row with the rule recorded in `SUBTOTAL_SOURCE`. Nothing is removed, and no computed measure is stored. Deduplication is a decision and this build makes none. |
 | D-26 | Dictionaries | Staged like facts, so the seed reads `STAGING` only. Staged per lane as `STG_{LANE}_*`, even when several lanes share one; no new `STG_SHARED_*` objects. |
 | D-27 | `RUN_ID` | Stamped by each MAIN when it starts and passed to the procedures it calls. MAINs take no parameters. On every table except the classification table, which carries `FIRST_SEEN_RUN_ID` and `LAST_SEEN_RUN_ID` instead. The only run stamp. |
@@ -1575,6 +1590,7 @@ and then it changes here, for every build after.
 | D-48 | Source precedence | A classified row may go to `UNKNOWN` as `DUPLICATE_DETAIL` only under a source-precedence rule approved by the owner for that lane and listed here; it keeps its `H1`-`H5`. Asserted by check 2(e) and 2(m). **Rules:** HERSHA (build 10): for `ACTUAL`, `CLN_HERSHA_FIN_TRIAL_BALANCE` beats `CLN_HERSHA_FIN_PL_MONTHLY` at every hotel (`COMPANY_ID`) TB carries; for `FORECAST`, `CLN_HERSHA_FIN_PL_MONTHLY` beats `CLN_HERSHA_FIN_TRIAL_BALANCE`. ALTERRA (build 11): the resorts' "... - Rentals & Repairs - Ski Butlers" lines in `CLN_ALTERRA_FIN_PL_MONTHLY` beat the Ski Butlers entity's "Alterra Resorts" section copy of them. JW_VENICE (build 12): for `ACTUAL`, `CLN_JW_VENICE_FIN_PL_DEPARTMENT` beats `CLN_JW_VENICE_FIN_PL_SUMMARY` for the `CLN_JW_VENICE_FIN_PL_DEPARTMENT` months (2025-08 and 2026-08); within `CLN_JW_VENICE_FIN_PL_DEPARTMENT`, `PERIOD_TYPE` MONTH beats YTD, the TOT_HTL sheet beats every other sheet (the 16 department sheets, CB included), and the first 98xxxx hours block beats its repeat (`<code> \| <text> \| #n`). UNDER_CANVAS (build 14): the P&L detail (`CLN_UNDER_CANVAS_FIN_GL_DETAIL_REVENUE`, `CLN_UNDER_CANVAS_FIN_GL_DETAIL_OPEX`, `CLN_UNDER_CANVAS_FIN_GL_DETAIL_NON_OPEX`, `CLN_UNDER_CANVAS_OPS_STATS_MONTHLY`) beats `CLN_UNDER_CANVAS_FIN_PL_SUMMARY` for every row; all 102 CONSOLIDATED_PL rows go to `UNKNOWN` as `DUPLICATE_DETAIL`, including its below-GOP lines (N-25). HHG (build 15): within `CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS`, the latest `FILE_DATE` wins per entity + month + scenario; an older file's rows count only for entity-months the latest file lacks entirely. BEAUMIER (build 15): the same rule within `CLN_BEAUMIER_FIN_FORECAST_VERSIONS`. |
 | D-49 | Unit scale | A lane's stated source unit is applied in transformation from a staged `SOURCE_UNIT_SCALE`, only for measures the data proves, as approved by the owner and listed here. Staging stays as booked. **Scales:** ATLANTIC_AVIATION (build 12): x1000 for every dollar line, Fuel Margin and Gallons ("(000's)"; Fuel Revenue / Gallons = 5.11 per gallon as stored); MPG, Landings, Trips x1 (N-17). |
 | D-50 | Source sign convention | Each fact staging table states how its source books money in `SOURCE_SIGN_CONVENTION`, one value per table with its evidence in `SOURCE_SIGN_CONVENTION_SOURCE`, proved at M1 against the source's own totals or structure and approved by the owner: `PRESENTED` (revenue and costs both positive), `DEBIT` (debits positive, credits negative), `PROFIT` (revenue positive, costs negative). Transformation applies it: `PRESENTED` VALUE = SOURCE_AMOUNT x VALUE_SIGN; `DEBIT` VALUE = -SOURCE_AMOUNT; `PROFIT` VALUE = SOURCE_AMOUNT; VALUE is null wherever VALUE_SIGN is null. SOURCE_AMOUNT stays as booked; the classification's VALUE_SIGN is unchanged (D-13), so no classification row changes. Carried on the transformation streams. **Conventions:** HERSHA (build 15): FIN_PL_MONTHLY, FIN_TRIAL_BALANCE DEBIT; OPS_STATS_MONTHLY PRESENTED. BEAUMIER (build 15): FIN_FORECAST_VERSIONS, FIN_BUDGET_MONTHLY PROFIT. HHG (build 15): FIN_FORECAST_VERSIONS PROFIT; FIN_PL_MONTHLY, OPS_ROUNDS_DAILY, FIN_BUDGET_MONTHLY PRESENTED. (Table names as renamed 2026-11-10, build 16.) JW_VENICE, NEWBURY (build 15): every table PRESENTED. A lane not listed is PRESENTED until its next build or rebuild. |
+| D-51 | Semantic pacing | `SEM_AI_PACING` is the seventh semantic table: the union of every lane's `XFRM_{LANE}_PACING` in marked lane blocks (D-36), one row per pacing row x metric column, built by `SPROC_SEM_AI_PACING`, called last by `SPROC_SEM_AI_MAIN`. Columns: RUN_ID, SOURCE_LANE, SITE, SITE_NAME, SNAPSHOT_DATE, SNAPSHOT_SOURCE, STAY_PERIOD_START, STAY_PERIOD_END, STAY_GRAIN (`DAY`, `MONTH`, `EVENT`), SEGMENT, SEGMENT_SOURCE, BOOKING_STATUS, VANTAGE, METRIC_NAME (the source column, verbatim), METRIC_UNIT, IS_ADDITIVE, VALUE, CURRENCY_CODE (currency and rate metrics only), IS_LATEST_SNAPSHOT, SOURCE_TABLE, SOURCE_LINE_KEY, ATTRIBUTES (OBJECT: every other column of the stream as stored). Each source table unpivots the metric columns it populates, `INCLUDE NULLS`, with k stated per table; an all-null cell of an undeclared column is not emitted, and every non-null value and every undeclared table always is. VALUE is never scaled, signed or recomputed. METRIC_UNIT and IS_ADDITIVE come from a per-lane mapping approved by the owner: rates, ratios and percent changes are not additive. IS_LATEST_SNAPSHOT marks SNAPSHOT_DATE = the maximum per lane, site and source table. A sum over it is valid only within one SNAPSHOT_DATE (or IS_LATEST_SNAPSHOT), one VANTAGE, one CURRENCY_CODE, and IS_ADDITIVE. SOURCE_LINE_KEY is null where the lane has no unique line id. Pacing never feeds the seeder (D-37). Reconciled per lane, source table, metric and snapshot (rows, non-null count, sum) by `reconcile_PACING.sql`, which also fails for **any process lane (one with `SPROC_XFRM_{LANE}_MAIN` in the same database) whose `XFRM_{LANE}_PACING` has rows and `SEM_AI_PACING` has none**, so a new lane's pacing fails loudly until it has a block; any other `XFRM_..._PACING` table is listed as "not a process lane, not checked", with no PASS or FAIL, and is not counted. Build 17: NEWBURY `CLN_NEWBURY_BOSTON_OPS_RATE_SHOPS` stays in transformation only (competitor rates, not pace); KSL_SELECT_SERVICE and PEREGRINE_RESORTS have a null SOURCE_LINE_KEY (N-42). |
 
 ### Questions
 

@@ -7,7 +7,8 @@ $$
 -- ============================================================================
 -- SPROC_SEM_AI_MAIN
 -- Semantic orchestrator, shared by every lane. Builds nothing itself.
--- Stamps its own RUN_ID and passes it to the six semantic models.
+-- Stamps its own RUN_ID and passes it to the seven semantic models
+-- (SEM_AI_PACING added in build 17, D-51; called last).
 -- Calls no other MAIN. Catches no exception.
 -- ============================================================================
 declare
@@ -40,6 +41,10 @@ begin
     v_log := v_log || '; ' || v_r;
 
     call DEV_G2M_AI.SEMANTIC.SPROC_SEM_AI_UNKNOWN(:v_run_id) into :v_r;
+    v_models := v_models + 1;
+    v_log := v_log || '; ' || v_r;
+
+    call DEV_G2M_AI.SEMANTIC.SPROC_SEM_AI_PACING(:v_run_id) into :v_r;
     v_models := v_models + 1;
     v_log := v_log || '; ' || v_r;
 
