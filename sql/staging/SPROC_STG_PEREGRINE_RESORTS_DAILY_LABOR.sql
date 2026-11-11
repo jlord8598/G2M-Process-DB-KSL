@@ -21,6 +21,8 @@ $$
 -- exact SITE_TAG match (unique there), named in ASSET_NAME_SOURCE (owner Q-13).
 -- STG_PEREGRINE_RESORTS_SITES is built first by the lane's MAIN.
 -- SCENARIO: the source names none; the table name without schema (D-45).
+-- STAT_UNIT_FAMILY: 'HOURS' (build 18, owner Q-01 (A), D-29): STAT_VALUE is HOURS,
+-- SOURCE_AMOUNT is the wages (AMOUNTS) on the same row. EFFECTIVE_RATE stays here only.
 -- ============================================================================
 declare
     v_rows integer;
@@ -78,7 +80,7 @@ begin
         , coalesce(cln.c_acct, cln.c_stat, cln.c_item, '~BLANK~')::varchar      as account_key
         , 'AMOUNT'::varchar                                                     as record_type
         , 'No ACCOUNT_NUMBER or STAT_ACCOUNT column in source; AMOUNTS and HOURS on one row: AMOUNT (assumption, Q-15)'::varchar as record_type_source
-        , null::varchar                                                         as stat_unit_family
+        , 'HOURS'::varchar                                                      as stat_unit_family
         , cln.label::varchar                                                    as account_desc
         , cln.business_date::date                                               as period_end
         , 'CUR_PROFITSWORD_PEREGRINE_DAILY_LABOR'::varchar                    as scenario

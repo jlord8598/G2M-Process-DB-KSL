@@ -16,6 +16,8 @@ Two companion documents. **Read them; do not summarise from this file.**
 | `docs/sources.md` | This build's lanes and what M1 measured about them. Written during M1, not before. |
 | `docs/design-rationale.md` | Why the architecture is shaped this way. Read once; consult when a rule looks arbitrary. |
 
+Downstream consumer, not part of any build: `docs/workiva.md` (the Workiva reporting table, built today from iLevel). Read it only when a decision changes how these semantic tables could be consumed: investment key, currency, operating metrics.
+
 Records of previous builds are in `docs/completed-builds/`. They are history,
 not instructions: useful for seeing how a similar source was handled, never
 authoritative for this one.

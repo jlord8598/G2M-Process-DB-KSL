@@ -70,7 +70,7 @@ begin
 
     if (:P_LANE = 'KSL_SELECT_SERVICE') then
         -- ====================================================================
-        -- LANE KSL_SELECT_SERVICE (build 01; rebuilt builds 04, 05, 13, D-44)
+        -- LANE KSL_SELECT_SERVICE (build 01; rebuilt builds 04, 05, 13, 18, D-44)
         -- Build 13 (owner Q-01, Q-05; D-46 account blocks, char 5-8 of the
         -- account): 1x Assets; 2x Assets (due-from); 30-38 and 3900-3955
         -- Liabilities; 3956-3999 Equity; 4x Revenue; 5x COGS; 6x Payroll; 7x
@@ -91,18 +91,22 @@ begin
             fact as (
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
+                     , false as is_labor
                 from DEV_G2M_AI.STAGING.STG_KSL_SELECT_SERVICE_DAILY_EXTENDED
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
+                     , false as is_labor
                 from DEV_G2M_AI.STAGING.STG_KSL_SELECT_SERVICE_MONTHLY_EXTENDED
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
+                     , false as is_labor
                 from DEV_G2M_AI.STAGING.STG_KSL_SELECT_SERVICE_LEDGER_BATCHES
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
+                     , true as is_labor
                 from DEV_G2M_AI.STAGING.STG_KSL_SELECT_SERVICE_DAILY_LABOR
             )
             -- ----------------------------------------------------------------
@@ -120,6 +124,7 @@ begin
                     , min(account_number)                                     as account_number
                     , min(stat_account)                                       as stat_account
                     , min(account_desc)                                       as account_desc
+                    , boolor_agg(is_labor)                                    as is_labor
                 from fact
                 where 1=1
                 group by 1, 2, 3, 4, 5
@@ -183,6 +188,18 @@ begin
                       end as seed_source
                 from prop
             )
+            -- ----------------------------------------------------------------
+            -- labor keys (build 18, owner Q-01 (A), Q-04): DAILY_LABOR rows only;
+            -- no labor key is shared with a non-labor row (M1)
+            -- ----------------------------------------------------------------
+            , cls2 as (
+                select * replace (
+                      iff(is_labor, 'Statistic', h1)     as h1
+                    , iff(is_labor, 'DAILY_LABOR', h2)   as h2
+                    , iff(is_labor, 'DAILY_LABOR (build 18, owner Q-01 (A) / Q-04): labor never enters the P&L; H1 Statistic, wages kept as AMOUNT, METRIC_UNIT CURRENCY, hours as STAT_VALUE with STAT_UNIT_FAMILY HOURS (D-29; B09-D4 pattern)', seed_source) as seed_source
+                )
+                from cls
+            )
             select
                   k_lane, k_site, k_dept, k_acct, k_rtype
                 , asset_name, department_name, account_number, stat_account, account_desc
@@ -213,12 +230,13 @@ begin
                       when 'Operating Expenses'       then -1
                       when 'Depreciation & Amortization' then -1
                   end::number(2,0) as value_sign
-                , null::varchar as metric_unit
-                , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
+                , iff(is_labor, 'CURRENCY', null)::varchar as metric_unit
+                , case when h1 = 'Statistic' then iff(is_labor, 'FLOW', 'UNRATIFIED') end as aggregation_type
+                , is_labor
                 , seed_source
                 , (k_rtype = 'AMOUNT' and acct_ok
                    and (digit in (2, 3) or main4 in ('8704', '8705', '8712', '8720'))) as reseed_block
-            from cls
+            from cls2
         ) src
             on  tgt.source_lane      = src.k_lane
             and tgt.source_site_code = src.k_site
@@ -227,6 +245,26 @@ begin
             and tgt.record_type      = src.k_rtype
         -- D-44 re-seed (owner Q-01, Q-05, build 13): changed blocks only, and only
         -- where the stored classification differs from the approved mapping
+        -- D-44 re-seed (owner Q-01 (A), Q-04, build 18): labor keys only, and only
+        -- where the stored classification differs from the labor mapping
+        when matched and src.is_labor
+                     and (tgt.h1 is distinct from src.h1 or tgt.h2 is distinct from src.h2
+                          or tgt.metric_unit is distinct from src.metric_unit
+                          or tgt.aggregation_type is distinct from src.aggregation_type
+                          or tgt.value_sign is distinct from src.value_sign
+                          or tgt.seed_source is distinct from src.seed_source) then update set
+              tgt.h1               = src.h1
+            , tgt.h2               = src.h2
+            , tgt.h3               = src.h3
+            , tgt.h4               = src.h4
+            , tgt.h5               = src.h5
+            , tgt.p_l_section      = src.p_l_section
+            , tgt.normal_balance   = src.normal_balance
+            , tgt.value_sign       = src.value_sign
+            , tgt.metric_unit      = src.metric_unit
+            , tgt.aggregation_type = src.aggregation_type
+            , tgt.seed_source      = src.seed_source
+            , tgt.last_seen_run_id = :P_RUN_ID
         when matched and src.reseed_block
                      and (tgt.h1 is distinct from src.h1 or tgt.h2 is distinct from src.h2
                           or tgt.p_l_section is distinct from src.p_l_section
@@ -262,7 +300,7 @@ begin
 
     elseif (:P_LANE = 'PEREGRINE_RESORTS') then
         -- ====================================================================
-        -- LANE PEREGRINE_RESORTS (build 01; rebuilt builds 04, 05, 13, D-44)
+        -- LANE PEREGRINE_RESORTS (build 01; rebuilt builds 04, 05, 13, 18, D-44)
         -- Build 13 (owner Q-01, Q-05; D-46 account blocks, char 5-8 of the
         -- account): 1x Assets; 2x Assets (due-from); 30-38 and 3900-3955
         -- Liabilities; 3956-3999 Equity; 4x Revenue; 5x COGS; 6x Payroll; 7x
@@ -283,18 +321,22 @@ begin
             fact as (
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
+                     , false as is_labor
                 from DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_DAILY_EXTENDED
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
+                     , false as is_labor
                 from DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_MONTHLY_EXTENDED
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
+                     , false as is_labor
                 from DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_LEDGER_BATCHES
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
+                     , true as is_labor
                 from DEV_G2M_AI.STAGING.STG_PEREGRINE_RESORTS_DAILY_LABOR
             )
             -- ----------------------------------------------------------------
@@ -312,6 +354,7 @@ begin
                     , min(account_number)                                     as account_number
                     , min(stat_account)                                       as stat_account
                     , min(account_desc)                                       as account_desc
+                    , boolor_agg(is_labor)                                    as is_labor
                 from fact
                 where 1=1
                 group by 1, 2, 3, 4, 5
@@ -378,6 +421,18 @@ begin
                       end as seed_source
                 from prop
             )
+            -- ----------------------------------------------------------------
+            -- labor keys (build 18, owner Q-01 (A), Q-04): DAILY_LABOR rows only;
+            -- no labor key is shared with a non-labor row (M1)
+            -- ----------------------------------------------------------------
+            , cls2 as (
+                select * replace (
+                      iff(is_labor, 'Statistic', h1)     as h1
+                    , iff(is_labor, 'DAILY_LABOR', h2)   as h2
+                    , iff(is_labor, 'DAILY_LABOR (build 18, owner Q-01 (A) / Q-04): labor never enters the P&L; H1 Statistic, wages kept as AMOUNT, METRIC_UNIT CURRENCY, hours as STAT_VALUE with STAT_UNIT_FAMILY HOURS (D-29; B09-D4 pattern)', seed_source) as seed_source
+                )
+                from cls
+            )
             select
                   k_lane, k_site, k_dept, k_acct, k_rtype
                 , asset_name, department_name, account_number, stat_account, account_desc
@@ -408,12 +463,13 @@ begin
                       when 'Operating Expenses'       then -1
                       when 'Depreciation & Amortization' then -1
                   end::number(2,0) as value_sign
-                , null::varchar as metric_unit
-                , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
+                , iff(is_labor, 'CURRENCY', null)::varchar as metric_unit
+                , case when h1 = 'Statistic' then iff(is_labor, 'FLOW', 'UNRATIFIED') end as aggregation_type
+                , is_labor
                 , seed_source
                 , (k_rtype = 'AMOUNT' and acct_ok
                    and (digit in (2, 3) or main4 in ('8704', '8705', '8712', '8720') or (digit = 8 and blk2 = '86'))) as reseed_block
-            from cls
+            from cls2
         ) src
             on  tgt.source_lane      = src.k_lane
             and tgt.source_site_code = src.k_site
@@ -422,6 +478,26 @@ begin
             and tgt.record_type      = src.k_rtype
         -- D-44 re-seed (owner Q-01, Q-05, build 13): changed blocks only, and only
         -- where the stored classification differs from the approved mapping
+        -- D-44 re-seed (owner Q-01 (A), Q-04, build 18): labor keys only, and only
+        -- where the stored classification differs from the labor mapping
+        when matched and src.is_labor
+                     and (tgt.h1 is distinct from src.h1 or tgt.h2 is distinct from src.h2
+                          or tgt.metric_unit is distinct from src.metric_unit
+                          or tgt.aggregation_type is distinct from src.aggregation_type
+                          or tgt.value_sign is distinct from src.value_sign
+                          or tgt.seed_source is distinct from src.seed_source) then update set
+              tgt.h1               = src.h1
+            , tgt.h2               = src.h2
+            , tgt.h3               = src.h3
+            , tgt.h4               = src.h4
+            , tgt.h5               = src.h5
+            , tgt.p_l_section      = src.p_l_section
+            , tgt.normal_balance   = src.normal_balance
+            , tgt.value_sign       = src.value_sign
+            , tgt.metric_unit      = src.metric_unit
+            , tgt.aggregation_type = src.aggregation_type
+            , tgt.seed_source      = src.seed_source
+            , tgt.last_seen_run_id = :P_RUN_ID
         when matched and src.reseed_block
                      and (tgt.h1 is distinct from src.h1 or tgt.h2 is distinct from src.h2
                           or tgt.p_l_section is distinct from src.p_l_section
