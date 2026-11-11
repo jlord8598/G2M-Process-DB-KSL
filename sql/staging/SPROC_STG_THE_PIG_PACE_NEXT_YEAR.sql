@@ -7,9 +7,13 @@ $$
 -- ============================================================================
 -- SPROC_STG_THE_PIG_PACE_NEXT_YEAR
 -- Builds STAGING.STG_THE_PIG_PACE_NEXT_YEAR from
--- CLN.BOX_INVESTMENT_DATA.CLN_PIG_HOTELS_PACE_NEXT_YEAR. Pacing source (D-24), pacing-only lane: kept in its own shape; as-of = SNAPSHOT_DATE.
+-- CLN.BOX_INVESTMENT_DATA.CLN_PIG_HOTELS_PACE_OTB_MONTHLY. Pacing source (D-24), pacing-only lane: kept in its own shape; as-of = SNAPSHOT_DATE.
 -- Every source column verbatim, plus RUN_ID, SOURCE_LANE and SOURCE_TABLE.
 -- Identity form: long. count(source) = count(staged).
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
+-- The old view's WHERE selects this model's half of the merged table
+-- (a clean partition; PACE_YEAR carried).
 -- ============================================================================
 declare
     v_rows integer;
@@ -18,9 +22,9 @@ begin
     select
           :P_RUN_ID::varchar                                                  as run_id
         , 'THE_PIG'::varchar                                                      as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_PIG_HOTELS_PACE_NEXT_YEAR'::varchar                            as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_PIG_HOTELS_PACE_OTB_MONTHLY'::varchar                            as source_table
         , src.*
-    from CLN.BOX_INVESTMENT_DATA.CLN_PIG_HOTELS_PACE_NEXT_YEAR src
+    from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_PIG_HOTELS_PACE_OTB_MONTHLY where pace_year = 'NEXT_YEAR') src
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_THE_PIG_PACE_NEXT_YEAR);

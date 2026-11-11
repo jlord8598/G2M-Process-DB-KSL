@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_JW_VENICE_FCAST_BY_PERIOD
 -- Builds STAGING.STG_JW_VENICE_FCAST_BY_PERIOD from
--- CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FCAST_BY_PERIOD.
+-- CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FIN_PL_SUMMARY.
 -- Fact table: forecast template, prior-year actual by period.
 -- Identity form: wide by category, 2 branches (ACTUAL_AMOUNT, FORECAST_AMOUNT),
 -- nulls kept: count(staged) = count(source) x 2.
@@ -27,6 +27,10 @@ $$
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried verbatim.
 -- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
+-- The old view's WHERE selects this model's half of the merged table
+-- (a clean partition; SOURCE_OBJECT carried).
 -- ============================================================================
 declare
     v_rows integer;
@@ -38,7 +42,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FCAST_BY_PERIOD
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FIN_PL_SUMMARY where source_object = 'REPORT_CELLS: JW_VENICE_FCAST_BY_PERIOD')
     )
     -- ------------------------------------------------------------------------
     -- unpivot by category: one branch per measure column, nulls kept
@@ -75,7 +79,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'JW_VENICE'::varchar                                                     as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FCAST_BY_PERIOD'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FIN_PL_SUMMARY'::varchar as source_table
         , nullif(trim(cln.property_name), '')::varchar                                    as source_site_code
         , cln.property_name::varchar                                                      as asset_name
         , nullif(trim(cln.section), '')::varchar                                    as department

@@ -7,11 +7,13 @@ $$
 -- ============================================================================
 -- SPROC_STG_HHG_CHART_OF_ACCOUNTS
 -- Builds STAGING.STG_HHG_CHART_OF_ACCOUNTS from
--- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_CHART_OF_ACCOUNTS.
+-- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_CHART_OF_ACCOUNTS.
 -- Dictionary: department + natural account, ACCOUNT_TYPE, PL_SECTION.
 -- Unique on DEPARTMENT_CODE + NATURAL_ACCOUNT (M1). Read by the seeder (Q-03).
 -- Every source column verbatim, plus RUN_ID, SOURCE_LANE and SOURCE_TABLE.
 -- Identity form: long. count(source) = count(staged). Added in build 10 (Q-01).
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -20,9 +22,9 @@ begin
     select
           :P_RUN_ID::varchar  as run_id
         , 'HHG'::varchar  as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_CHART_OF_ACCOUNTS'::varchar  as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_CHART_OF_ACCOUNTS'::varchar  as source_table
         , src.*
-    from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_CHART_OF_ACCOUNTS src
+    from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_CHART_OF_ACCOUNTS) src
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_HHG_CHART_OF_ACCOUNTS);

@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_NEWBURY_OPERATING_STATS_PYACT
 -- Builds STAGING.STG_NEWBURY_OPERATING_STATS_PYACT from
--- CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPERATING_STATS_PYACT. Fact table (owner Q-12).
+-- CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPS_STATS_DAILY_ACTUAL. Fact table (owner Q-12).
 -- Identity form: long. count(source) = count(staged).
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried
 -- verbatim; standard columns derived alongside (docs/sources.md).
@@ -21,6 +21,8 @@ $$
 -- source (M1); nothing is filled.
 -- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -32,7 +34,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPERATING_STATS_PYACT
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPS_STATS_DAILY_ACTUAL)
     )
     -- ------------------------------------------------------------------------
     -- cleaned key inputs
@@ -49,7 +51,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'NEWBURY'::varchar                                                    as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPERATING_STATS_PYACT'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPS_STATS_DAILY_ACTUAL'::varchar as source_table
         , cln.c_site::varchar                                                   as source_site_code
         , cln.property_name::varchar                                            as asset_name
         , null::varchar                                                         as department

@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_UNDER_CANVAS_CAMP_OPERATING_EXPENSES
 -- Builds STAGING.STG_UNDER_CANVAS_CAMP_OPERATING_EXPENSES from
--- CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_CAMP_OPERATING_EXPENSES.
+-- CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_FIN_GL_DETAIL_OPEX.
 -- Fact table: operating department expenses (Sage Intacct export, Under Canvas actuals file).
 -- Identity form: long, one branch (ACTUAL_AMOUNT). FORECAST_AMOUNT and
 -- BUDGET_AMOUNT are null on every row (M1): no branch; carried raw.
@@ -20,6 +20,8 @@ $$
 -- SOURCE_LINE_KEY: SOURCE_ROW_NUMBER (unique in the table, M1).
 -- Source columns DEPARTMENT and SCENARIO are carried as SRC_DEPARTMENT and
 -- SRC_SCENARIO: the names are taken by standard columns.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -31,7 +33,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_CAMP_OPERATING_EXPENSES
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_FIN_GL_DETAIL_OPEX)
     )
     -- ------------------------------------------------------------------------
     -- cleaned key inputs (structural code splits)
@@ -50,7 +52,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'UNDER_CANVAS'::varchar                                               as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_CAMP_OPERATING_EXPENSES'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_FIN_GL_DETAIL_OPEX'::varchar as source_table
         , cln.c_site::varchar                                                   as source_site_code
         , cln.c_site_name::varchar                                              as asset_name
         , cln.c_dept::varchar                                                   as department

@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_UNDER_CANVAS_CONSOLIDATED_PL
 -- Builds STAGING.STG_UNDER_CANVAS_CONSOLIDATED_PL from
--- CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_CONSOLIDATED_PL.
+-- CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_FIN_PL_SUMMARY.
 -- Fact table: the actuals file's P&L summary, one YTD value per line at
 -- 2026-09-30. Every row loses to the P&L detail under D-48 in transformation
 -- (owner Q-04): UNKNOWN, DUPLICATE_DETAIL.
@@ -20,6 +20,8 @@ $$
 -- SCENARIO: the source's SCENARIO, verbatim. PERIOD_TYPE (YTD) carried raw.
 -- SOURCE_LINE_KEY: LINE_ORDER | PERIOD_TYPE.
 -- Source column SCENARIO is carried as SRC_SCENARIO.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -28,7 +30,7 @@ begin
     with
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_CONSOLIDATED_PL
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_FIN_PL_SUMMARY)
     )
     , cln as (
         select
@@ -40,7 +42,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'UNDER_CANVAS'::varchar                                               as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_CONSOLIDATED_PL'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_FIN_PL_SUMMARY'::varchar as source_table
         , nullif(trim(cln.entity_name), '')::varchar                            as source_site_code
         , cln.entity_name::varchar                                              as asset_name
         , nullif(trim(cln.source_section_label), '')::varchar                   as department

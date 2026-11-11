@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_HHG_ROUNDS_DETAIL
 -- Builds STAGING.STG_HHG_ROUNDS_DETAIL from
--- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL. Fact table,
+-- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY. Fact table,
 -- statistics (owner Q-07).
 -- Identity form: long. count(source) = count(staged).
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried
@@ -20,6 +20,8 @@ $$
 -- table, so SCENARIO = the table name without schema (D-45, build 06 Q-03).
 -- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -31,7 +33,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY)
     )
     -- ------------------------------------------------------------------------
     -- cleaned key inputs
@@ -52,12 +54,12 @@ begin
         select
               c.club_code
             , c.club_name
-        from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_CLUB_LIST c
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_PROPERTY_STATUS) c
     )
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'HHG'::varchar                                                        as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL'::varchar    as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY'::varchar    as source_table
         , cln.c_site::varchar                                                   as source_site_code
         , club.club_name::varchar                                               as asset_name
         , null::varchar                                                         as department

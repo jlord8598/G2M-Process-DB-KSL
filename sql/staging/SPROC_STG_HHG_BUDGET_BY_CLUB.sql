@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_HHG_BUDGET_BY_CLUB
 -- Builds STAGING.STG_HHG_BUDGET_BY_CLUB from
--- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_BUDGET_BY_CLUB. Fact table. New in
+-- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_BUDGET_MONTHLY. Fact table. New in
 -- build 15 (owner, stop 1: HHG has no budget), mapped with the existing HHG
 -- chart rules (same as SPROC_STG_HHG_TR12_DATA).
 -- Identity form: long. count(source) = count(staged).
@@ -26,6 +26,8 @@ $$
 -- 115,356 rows match, build 15 M1).
 -- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -37,7 +39,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_BUDGET_BY_CLUB
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_BUDGET_MONTHLY)
     )
     -- ------------------------------------------------------------------------
     -- cleaned key inputs
@@ -62,7 +64,7 @@ begin
             , a.account_description
             , a.department_description
             , a.parent_code
-        from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ACCOUNTS a
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_ACCOUNTS) a
     )
     -- ------------------------------------------------------------------------
     -- club name by GL entity, unique on CLUB_NUMBER (build 10 M1)
@@ -76,7 +78,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'HHG'::varchar                                                        as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_BUDGET_BY_CLUB'::varchar        as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_BUDGET_MONTHLY'::varchar        as source_table
         , cln.c_site::varchar                                                   as source_site_code
         , refs.club_name::varchar                                               as asset_name
         , case
@@ -135,7 +137,7 @@ begin
     from cln
     left join acct
         on  acct.full_account_string = cln.account_code
-        and acct.source_table = 'CLN_HERITAGE_GOLF_BUDGET_BY_CLUB'
+        and acct.source_table = 'CLN_HERITAGE_GOLF_FIN_BUDGET_MONTHLY'
     left join refs
         on  refs.club_number = cln.c_site
     where 1=1;

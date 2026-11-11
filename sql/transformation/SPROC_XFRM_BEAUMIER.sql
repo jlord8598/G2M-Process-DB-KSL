@@ -32,6 +32,8 @@ $$
 --   (owner Q-08): within BP the latest FILE_DATE wins per entity + month +
 --   scenario; older-file rows count only for entity-months the latest file
 --   lacks; losers to UNKNOWN as DUPLICATE_DETAIL, keeping H1-H5.
+-- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
+-- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
 -- ============================================================================
 declare
     v_is  integer;
@@ -89,18 +91,18 @@ begin
         select
               fact.*
             , case
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BP' and fact.scenario = 'BP'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_FORECAST_VERSIONS' and fact.scenario = 'BP'
                       then 'BUDGET'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BP' and fact.scenario in ('Forecast', 'Last Fcst', 'Downgraded Fcst')
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_FORECAST_VERSIONS' and fact.scenario in ('Forecast', 'Last Fcst', 'Downgraded Fcst')
                       then 'FORECAST'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BUDGET' and fact.scenario = 'Budget'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_BUDGET_MONTHLY' and fact.scenario = 'Budget'
                       then 'BUDGET'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BUDGET' and fact.scenario = 'Prior Year'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_BUDGET_MONTHLY' and fact.scenario = 'Prior Year'
                       then 'ACTUAL'
               end as category
             , coalesce(fact.scenario, '~BLANK~') as category_input
-            , (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BP'
-               and fact.file_date < max(iff(fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BP', fact.file_date, null))
+            , (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_FORECAST_VERSIONS'
+               and fact.file_date < max(iff(fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_FORECAST_VERSIONS', fact.file_date, null))
                                       over (partition by fact.source_table, fact.source_site_code, fact.period_end, fact.scenario))::boolean as d48_loses
         from fact
         where 1=1

@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_HERSHA_GL_STAT
 -- Builds STAGING.STG_HERSHA_GL_STAT from
--- CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_GL_STAT.
+-- CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_OPS_STATS_MONTHLY.
 -- Fact table, statistics (owner Q-02).
 -- Identity form: wide by category, 2 branches (ACTUAL_*, FORECAST_*), nulls kept:
 -- count(staged) = count(source) x 2. Each branch carries its amount and stat.
@@ -21,6 +21,10 @@ $$
 -- FORECAST_AMOUNT: the source names no scenario (D-45, build 06 Q-03).
 -- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
+-- TEMPORARY (build 16 Q-02, one-build exception to invariant 1): the old
+-- view's own WHERE, kept as written. Rows it leaves unread: N-37 (1,798 non-preferred rows).
 -- ============================================================================
 declare
     v_rows integer;
@@ -32,7 +36,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_GL_STAT
+        from (select source_folder, portfolio_name as property_name, * exclude (source_folder) from CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_OPS_STATS_MONTHLY where preferred_row)
     )
     -- ------------------------------------------------------------------------
     -- unpivot by category: one branch per measure pair, nulls kept
@@ -45,7 +49,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'HERSHA'::varchar                                                     as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_GL_STAT'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_OPS_STATS_MONTHLY'::varchar as source_table
         , nullif(trim(unp.company_id), '')::varchar                             as source_site_code
         , unp.company_name::varchar                                             as asset_name
         , nullif(trim(unp.department_code), '')::varchar                        as department

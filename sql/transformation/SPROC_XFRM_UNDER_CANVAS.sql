@@ -29,6 +29,8 @@ $$
 -- VALUE = SOURCE_AMOUNT * VALUE_SIGN. SOURCE_AMOUNT and STAT_VALUE unchanged.
 -- No filter, no aggregation. The scratch table is dropped before return.
 -- Built from the lane-independent text of SPROC_XFRM_UNDER_CANVAS.
+-- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
+-- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
 -- ============================================================================
 declare
     v_is  integer;
@@ -108,7 +110,7 @@ begin
                   when fact.measure_column = 'BUDGET'            then 'BUDGET'
               end as category
             , coalesce(fact.measure_column, '~BLANK~') as category_input
-            , (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_CONSOLIDATED_PL')::boolean as d48_loses
+            , (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_FIN_PL_SUMMARY')::boolean as d48_loses
         from fact
         where 1=1
     )

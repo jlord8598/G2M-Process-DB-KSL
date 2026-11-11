@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_BEAUMIER_BP
 -- Builds STAGING.STG_BEAUMIER_BP from
--- CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BP.
+-- CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_FORECAST_VERSIONS.
 -- Fact table.
 -- Identity form: long. count(source) = count(staged).
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried verbatim;
@@ -23,6 +23,8 @@ $$
 -- Build 15 (Q-06, N-19): CURRENCY_CODE per hotel from STG_BEAUMIER_CANCELLATIONS
 -- through LOCATION_MAP.HOTEL_NAME (9 EUR, HGB / HSB CHF); BMR and CPH, which
 -- state none, UNCONFIRMED. CANCELLATIONS is staged first (BEAUMIER MAIN).
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -31,7 +33,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'BEAUMIER'::varchar                                                   as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BP'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_FORECAST_VERSIONS'::varchar as source_table
         , nullif(trim(src.hotel_code), '')::varchar                             as source_site_code
         , loc.hotel_name::varchar                                               as asset_name
         , case
@@ -86,7 +88,7 @@ begin
         , src.file_date
         , src.source_file_path
         , src.source_row_number
-    from CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_BP src
+    from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_FORECAST_VERSIONS) src
     left join DEV_G2M_AI.STAGING.STG_BEAUMIER_LOCATION_MAP loc
         on  loc.hotel_code = src.hotel_code
     left join (

@@ -7,10 +7,12 @@ $$
 -- ============================================================================
 -- SPROC_STG_UNDER_CANVAS_ACCOUNTS
 -- Builds STAGING.STG_UNDER_CANVAS_ACCOUNTS from
--- CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_ACCOUNTS. Dictionary: one row per source table x location x account x department.
+-- CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_REF_ACCOUNTS. Dictionary: one row per source table x location x account x department.
 -- Every source column verbatim, plus RUN_ID, SOURCE_LANE and SOURCE_TABLE.
 -- The source column SOURCE_TABLE is carried as ACCOUNTS_SOURCE_TABLE: the name is taken by the lineage column.
 -- Identity form: long. count(source) = count(staged).
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -19,9 +21,9 @@ begin
     select
           :P_RUN_ID::varchar                                                  as run_id
         , 'UNDER_CANVAS'::varchar                                                      as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_ACCOUNTS'::varchar                            as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_REF_ACCOUNTS'::varchar                            as source_table
         , src.* rename (source_table as accounts_source_table)
-    from CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_ACCOUNTS src
+    from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_REF_ACCOUNTS) src
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_UNDER_CANVAS_ACCOUNTS);

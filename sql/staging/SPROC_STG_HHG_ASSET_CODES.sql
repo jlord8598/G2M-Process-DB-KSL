@@ -7,11 +7,13 @@ $$
 -- ============================================================================
 -- SPROC_STG_HHG_ASSET_CODES
 -- Builds STAGING.STG_HHG_ASSET_CODES from
--- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ASSET_CODES.
+-- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_PROPERTIES.
 -- Dictionary: club number, code, name, acquisition date, regional group.
 -- Unique on CLUB_NUMBER (M1). Feeds ASSET_NAME of STG_HHG_TR12_DATA (Q-02).
 -- Every source column verbatim, plus RUN_ID, SOURCE_LANE and SOURCE_TABLE.
 -- Identity form: long. count(source) = count(staged). Added in build 10 (Q-01).
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -20,9 +22,9 @@ begin
     select
           :P_RUN_ID::varchar  as run_id
         , 'HHG'::varchar  as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ASSET_CODES'::varchar  as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_PROPERTIES'::varchar  as source_table
         , src.*
-    from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ASSET_CODES src
+    from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_PROPERTIES) src
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_HHG_ASSET_CODES);

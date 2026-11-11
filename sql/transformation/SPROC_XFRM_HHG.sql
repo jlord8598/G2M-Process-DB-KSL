@@ -35,6 +35,8 @@ $$
 --   wins per entity + month + scenario; an older file's rows count only for
 --   entity-months the latest file lacks; losers to UNKNOWN as DUPLICATE_DETAIL,
 --   keeping H1-H5.
+-- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
+-- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
 -- ============================================================================
 declare
     v_is  integer;
@@ -106,24 +108,24 @@ begin
         select
               fact.*
             , case
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_PL_MONTHLY'
                        and fact.scenario in ('ACT', 'PY ACT')
                       then 'ACTUAL'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS'
                        and fact.scenario = 'KFCST FINAL'
                       then 'FORECAST'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY'
                       then 'ACTUAL'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_BUDGET_BY_CLUB'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_BUDGET_MONTHLY'
                        and fact.scenario = 'FINAL: Budget Amount'
                       then 'BUDGET'
               end as category
             , case
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL' then fact.source_table
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY' then fact.source_table
                   else coalesce(fact.scenario, '~BLANK~')
               end as category_input
-            , (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
-               and fact.file_date < max(iff(fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN', fact.file_date, null))
+            , (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS'
+               and fact.file_date < max(iff(fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS', fact.file_date, null))
                                       over (partition by fact.source_table, fact.source_site_code, fact.period_end, fact.scenario))::boolean as d48_loses
         from fact
         where 1=1

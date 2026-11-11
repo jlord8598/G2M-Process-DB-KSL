@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_NEWBURY_TRIAL_BALANCE
 -- Builds STAGING.STG_NEWBURY_TRIAL_BALANCE from
--- CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_TRIAL_BALANCE. Fact table.
+-- CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_FIN_PL_MONTHLY. Fact table.
 -- Identity form: wide, 3 columns unpivoted (ACTUAL_AMOUNT, FORECAST_AMOUNT,
 -- BUDGET_AMOUNT), nulls kept: count(staged) = count(source) x 3 (Q-10).
 -- The unpivot is a UNION ALL of one branch per measure column; no branch
@@ -27,6 +27,8 @@ $$
 -- name no scenario. MEASURE_COLUMN names the branch; category is set at M5.
 -- Build 15 (D-50): SOURCE_SIGN_CONVENTION PRESENTED for every row, with its evidence
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -38,7 +40,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_TRIAL_BALANCE
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_FIN_PL_MONTHLY)
     )
     -- ------------------------------------------------------------------------
     -- unpivot: one branch per measure column, nulls kept
@@ -72,12 +74,12 @@ begin
               a.full_account_string
             , a.account_description
             , a.department_description
-        from CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_ACCOUNTS a
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_REF_ACCOUNTS) a
     )
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'NEWBURY'::varchar                                                    as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_TRIAL_BALANCE'::varchar   as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_FIN_PL_MONTHLY'::varchar   as source_table
         , cln.c_site::varchar                                                   as source_site_code
         , cln.property_name::varchar                                            as asset_name
         , cln.c_dept::varchar                                                   as department

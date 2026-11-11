@@ -7,11 +7,12 @@ $$
 -- ============================================================================
 -- SPROC_STG_BEAUMIER_LOCATION_MAP
 -- Builds STAGING.STG_BEAUMIER_LOCATION_MAP from
--- CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_LOCATION_MAP.
+-- CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_REF_PROPERTIES.
 -- Dictionary: hotel code to hotel name and ENTITY_TYPE (HOTEL / CORPORATE),
 -- unique on HOTEL_CODE (build 07 M1). New in build 07 (owner Q-03).
 -- Every source column verbatim, plus RUN_ID, SOURCE_LANE and SOURCE_TABLE.
 -- Identity form: long. count(source) = count(staged).
+-- Build 16: reads the new table name directly (the old view was select *).
 -- ============================================================================
 declare
     v_rows integer;
@@ -20,9 +21,9 @@ begin
     select
           :P_RUN_ID::varchar  as run_id
         , 'BEAUMIER'::varchar  as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_LOCATION_MAP'::varchar  as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_REF_PROPERTIES'::varchar  as source_table
         , src.*
-    from CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_LOCATION_MAP src
+    from CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_REF_PROPERTIES src
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_BEAUMIER_LOCATION_MAP);

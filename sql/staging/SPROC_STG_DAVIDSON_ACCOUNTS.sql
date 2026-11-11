@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_DAVIDSON_ACCOUNTS
 -- Builds STAGING.STG_DAVIDSON_ACCOUNTS from
--- CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_ACCOUNTS.
+-- CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_REF_ACCOUNTS.
 -- Dictionary: account strings per entity, derived by the source from both
 -- DAVIDSON facts. Not unique on entity + string + source table (M1, Q-10):
 -- staged as it is.
@@ -15,6 +15,8 @@ $$
 -- source's own SOURCE_TABLE column (which fact a string came from) is carried
 -- verbatim as RAW_SOURCE_TABLE, because SOURCE_TABLE is the standard column.
 -- Identity form: long. count(source) = count(staged).
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -23,9 +25,9 @@ begin
     select
           :P_RUN_ID::varchar  as run_id
         , 'DAVIDSON'::varchar  as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_ACCOUNTS'::varchar  as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_REF_ACCOUNTS'::varchar  as source_table
         , src.* rename (source_table as raw_source_table)
-    from CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_ACCOUNTS src
+    from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_REF_ACCOUNTS) src
     where 1=1;
 
     v_rows := (select count(*) from DEV_G2M_AI.STAGING.STG_DAVIDSON_ACCOUNTS);

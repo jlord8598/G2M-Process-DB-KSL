@@ -28,6 +28,8 @@ $$
 -- ATLANTIC_AVIATION and JW_VENICE in build 11; JW_VENICE rebuilt build 12). No exception
 -- is caught; an undeclared lane
 -- raises.
+-- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
+-- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
 -- ============================================================================
 declare
     v_before integer;
@@ -596,14 +598,14 @@ begin
                     , iff(coa.c_type is not null, 'department + natural account', 'natural account, single type') as t_how
                 from ext
                 left join amap
-                    on  ext.src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
+                    on  ext.src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS'
                     and amap.line_item = ext.k_acct
                 left join coa
-                    on  ext.src_tbl in ('CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA', 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_BUDGET_BY_CLUB')
+                    on  ext.src_tbl in ('CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_PL_MONTHLY', 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_BUDGET_MONTHLY')
                     and coa.c_dept = split_part(nullif(trim(ext.account_number), ''), '-', 2)
                     and coa.c_nat  = split_part(nullif(trim(ext.account_number), ''), '-', 3)
                 left join coa_nat
-                    on  ext.src_tbl in ('CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_TR12_DATA', 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_BUDGET_BY_CLUB')
+                    on  ext.src_tbl in ('CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_PL_MONTHLY', 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_BUDGET_MONTHLY')
                     and coa_nat.c_nat = split_part(nullif(trim(ext.account_number), ''), '-', 3)
             )
             , prop2 as (
@@ -630,7 +632,7 @@ begin
                     , case
                           when k_rtype = 'STATISTIC'            then 'Statistic'
                           when t_map is not null                then split_part(t_map, '|', 1)
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS'
                               then coalesce(a_h1, 'Unclassified')
                           when c_acct is null                   then 'Unclassified'
                           when not acct_ok                      then 'Unclassified'
@@ -643,10 +645,10 @@ begin
                       end as h1
                     , case
                           when k_rtype = 'STATISTIC'
-                               and src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL' then 'ROUNDS_COUNT'
+                               and src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY' then 'ROUNDS_COUNT'
                           when k_rtype = 'STATISTIC'             then 'STAT_9'
                           when t_map is not null                 then split_part(t_map, '|', 2)
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS'
                               then coalesce(a_h2, 'UNCLASSIFIED')
                           when c_acct is null or not acct_ok     then 'UNCLASSIFIED'
                           when digit = 1                         then 'Assets'
@@ -661,7 +663,7 @@ begin
                       end as h2
                     , case
                           when k_rtype = 'STATISTIC'
-                               and src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_ROUNDS_DETAIL'
+                               and src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY'
                               then 'RECORD_TYPE STATISTIC; H2 = ROUNDS_COUNT, the source column name (Q-07)'
                           when k_rtype = 'STATISTIC'
                               then 'RECORD_TYPE STATISTIC (dept 999, owner Q-01); H2 = STAT_9, section code, no family stated'
@@ -669,9 +671,9 @@ begin
                               then 'COA ACCOUNT_TYPE Revenue overridden to COGS for ' || nat || ' (build 10 Q-03)'
                           when t_map is not null
                               then 'COA ACCOUNT_TYPE ' || t_type || ' by ' || t_how || ' (D-46, build 10 Q-03)'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN' and a_h1 is not null
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS' and a_h1 is not null
                               then 'LINE_ITEM name as stated section (owner Q-04, stop 3)'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS'
                               then 'LINE_ITEM not in the approved map: nothing to derive'
                           when c_acct is null                    then 'no ACCOUNT_NUMBER: nothing to derive'
                           when not acct_ok                       then 'ACCOUNT_NUMBER malformed: not repaired'
@@ -1543,7 +1545,7 @@ begin
                       prop.*
                     , case
                           when k_rtype = 'STATISTIC'                 then 'Statistic'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' then
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' then
                               case
                                   when n between 4000 and 4999       then 'Revenue'
                                   when n between 5000 and 5006       then 'Expense'
@@ -1555,7 +1557,7 @@ begin
                                   when n between 8000 and 8999       then 'Below the Line'
                                   else 'Unclassified'
                               end
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL' then
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY' then
                               case
                                   when k_dept in ('Operating Revenues', 'MISCELLANEOUS INCOME')                            then 'Revenue'
                                   when k_dept in ('Departmental Expenses', 'Undistributed Operating Expenses')              then 'Expense'
@@ -1566,7 +1568,7 @@ begin
                       end as h1
                     , case
                           when k_rtype = 'STATISTIC'                 then coalesce(nat, k_acct)
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' then
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' then
                               case
                                   when n between 4000 and 4999       then 'Revenue'
                                   when n between 5000 and 5006       then 'Payroll'
@@ -1578,7 +1580,7 @@ begin
                                   when n between 8000 and 8999       then 'Other Income / (Expense)'
                                   else 'UNCLASSIFIED'
                               end
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL' then
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY' then
                               case
                                   when k_dept in ('Operating Revenues', 'MISCELLANEOUS INCOME')                            then 'Revenue'
                                   when k_dept in ('Departmental Expenses', 'Undistributed Operating Expenses')              then 'Operating Expenses'
@@ -1594,17 +1596,17 @@ begin
                               then 'RECORD_TYPE STATISTIC; H2 = the natural account, the source code (owner Q-07)'
                           when k_rtype = 'STATISTIC'
                               then 'RECORD_TYPE STATISTIC; H2 = the source line identifier (LINE_CLASS or PL line text; Q-06)'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' and n is null
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and n is null
                               then 'no natural account (one-segment or blank ACCOUNT): nothing to derive, not repaired'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' and (n between 4000 and 5006 or n in (5100, 5110) or n between 5200 and 5204 or n in (5900, 5990))
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and (n between 4000 and 5006 or n in (5100, 5110) or n between 5200 and 5204 or n in (5900, 5990))
                               then 'natural account ' || nat || ' (owner Q-09 map, from data; source owner to confirm)'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT' and n between 6000 and 8999
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and n between 6000 and 8999
                               then 'section digit ' || left(nat, 1) || ' of natural account ' || nat || ' (owner Q-09: as proposed)'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_HOTEL_MONTHLY_REPORT'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY'
                               then 'natural account ' || nat || ': not in the owner map, nothing derived'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL' and h1 <> 'Unclassified'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY' and h1 <> 'Unclassified'
                               then 'PL SECTION ' || k_dept || ' as stated section (owner Q-09)'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY'
                               then 'PL SECTION ' || k_dept || ': department section, mixes revenue and expense, not mapped (owner Q-09)'
                           else 'source table not in the lane: nothing to derive'
                       end as seed_source

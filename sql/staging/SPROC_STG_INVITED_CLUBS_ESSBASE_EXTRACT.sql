@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_INVITED_CLUBS_ESSBASE_EXTRACT
 -- Builds STAGING.STG_INVITED_CLUBS_ESSBASE_EXTRACT from
--- CLN.BOX_INVESTMENT_DATA.CLN_INVITED_CLUBS_ESSBASE_EXTRACT.
+-- CLN.BOX_INVESTMENT_DATA.CLN_INVITED_CLUBS_FIN_GL_MONTHLY.
 -- Fact table, 17.1M source rows.
 -- Identity form: wide, 3 columns unpivoted (ACTUAL_AMOUNT, FORECAST_AMOUNT,
 -- BUDGET_AMOUNT), nulls kept: count(staged) = count(source) x 3. UNION ALL of one
@@ -29,6 +29,8 @@ $$
 -- (Q-07). Site = ENTITY. Names from META ALIAS_DEFAULT (DESCRIPTION is empty).
 -- SOURCE_LINE_KEY: the 9 dimension columns, unique and never blank (M1), plus
 -- the measure; one source file row feeds many cells, so path|row is not a key.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -40,7 +42,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_INVITED_CLUBS_ESSBASE_EXTRACT
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_INVITED_CLUBS_FIN_GL_MONTHLY)
     )
     -- ------------------------------------------------------------------------
     -- unpivot: one branch per measure column, nulls kept
@@ -87,7 +89,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'INVITED_CLUBS'::varchar                                              as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_INVITED_CLUBS_ESSBASE_EXTRACT'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_INVITED_CLUBS_FIN_GL_MONTHLY'::varchar as source_table
         , nullif(trim(cln.entity), '')::varchar                                 as source_site_code
         , cln.entity_description::varchar                                       as asset_name
         , cln.department::varchar                                               as department

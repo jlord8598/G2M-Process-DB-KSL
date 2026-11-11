@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_DAVIDSON_FULL_YEAR_PL
 -- Builds STAGING.STG_DAVIDSON_FULL_YEAR_PL from
--- CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL. Fact table.
+-- CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY. Fact table.
 -- Identity form: wide by category, 2 branches (ACTUAL_*, FORECAST_*), nulls kept:
 -- count(staged) = count(source) x 2.
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried verbatim;
@@ -29,6 +29,8 @@ $$
 -- dictionary keys it).
 -- SOURCE_LINE_KEY: hotel, hotel name, sheet, section, line, period and the
 -- four file/row pointers (unique at M1) plus branch.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -40,7 +42,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY)
     )
     -- ------------------------------------------------------------------------
     -- unpivot by category: one branch per measure column, nulls kept
@@ -76,13 +78,13 @@ begin
             , min(a.account_description) as account_description
         from DEV_G2M_AI.STAGING.STG_DAVIDSON_ACCOUNTS a
         where 1=1
-          and a.raw_source_table = 'CLN_DAVIDSON_FULL_YEAR_PL'
+          and a.raw_source_table = 'CLN_DAVIDSON_FIN_PL_SUMMARY'
         group by a.entity_code, a.full_account_string
     )
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'DAVIDSON'::varchar                                                   as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FULL_YEAR_PL'::varchar          as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY'::varchar          as source_table
         , cln.c_site::varchar                                                   as source_site_code
         , cln.hotel_name::varchar                                               as asset_name
         , cln.c_dept::varchar                                                   as department

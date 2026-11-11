@@ -29,6 +29,8 @@ $$
 --   DEBIT -SOURCE_AMOUNT, PROFIT SOURCE_AMOUNT, PRESENTED SOURCE_AMOUNT x
 --   VALUE_SIGN; null wherever VALUE_SIGN is null. This lane: PRESENTED (every table).
 --   SOURCE_SIGN_CONVENTION and its source are carried on every stream.
+-- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
+-- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
 -- ============================================================================
 declare
     v_is  integer;
@@ -93,19 +95,19 @@ begin
         select
               fact.*
             , case
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_TRIAL_BALANCE' and fact.measure_column = 'ACTUAL_AMOUNT'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_FIN_PL_MONTHLY' and fact.measure_column = 'ACTUAL_AMOUNT'
                       then 'ACTUAL'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_TRIAL_BALANCE' and fact.measure_column = 'BUDGET_AMOUNT'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_FIN_PL_MONTHLY' and fact.measure_column = 'BUDGET_AMOUNT'
                       then 'BUDGET'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_TRIAL_BALANCE' and fact.measure_column = 'FORECAST_AMOUNT'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_FIN_PL_MONTHLY' and fact.measure_column = 'FORECAST_AMOUNT'
                       then 'FORECAST'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPERATING_STATS_BGT' and fact.scenario = 'Budget'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPS_STATS_DAILY_BUDGET' and fact.scenario = 'Budget'
                       then 'BUDGET'
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPERATING_STATS_PYACT' and fact.scenario = 'Actual'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_OPS_STATS_DAILY_ACTUAL' and fact.scenario = 'Actual'
                       then 'ACTUAL'
               end as category
             , case
-                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_TRIAL_BALANCE' then coalesce(fact.measure_column, '~BLANK~')
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_NEWBURY_BOSTON_FIN_PL_MONTHLY' then coalesce(fact.measure_column, '~BLANK~')
                   else coalesce(fact.scenario, '~BLANK~')
               end as category_input
         from fact

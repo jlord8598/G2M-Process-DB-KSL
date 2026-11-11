@@ -33,6 +33,8 @@ $$
 --   DEBIT -SOURCE_AMOUNT, PROFIT SOURCE_AMOUNT, PRESENTED SOURCE_AMOUNT x
 --   VALUE_SIGN; null wherever VALUE_SIGN is null. This lane: DEBIT (GL_ACTUAL, TB_ACTUAL; VALUE = -SOURCE_AMOUNT), PRESENTED (GL_STAT).
 --   SOURCE_SIGN_CONVENTION and its source are carried on every stream.
+-- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
+-- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
 -- ============================================================================
 declare
     v_is  integer;
@@ -108,10 +110,10 @@ begin
                   when fact.measure_column = 'FORECAST' then 'FORECAST'
               end as category
             , coalesce(fact.measure_column, '~BLANK~') as category_input
-            , (    (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_GL_ACTUAL'
+            , (    (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_PL_MONTHLY'
                     and fact.measure_column = 'ACTUAL'
                     and tb_site.tb_site_code is not null)
-                or (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_TB_ACTUAL'
+                or (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_TRIAL_BALANCE'
                     and fact.measure_column = 'FORECAST'))::boolean as d48_loses
         from fact
         left join tb_site

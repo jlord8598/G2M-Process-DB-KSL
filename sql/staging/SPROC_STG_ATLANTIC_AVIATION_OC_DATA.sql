@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_ATLANTIC_AVIATION_OC_DATA
 -- Builds STAGING.STG_ATLANTIC_AVIATION_OC_DATA from
--- CLN.BOX_INVESTMENT_DATA.CLN_ATLANTIC_AVIATION_OC_DATA.
+-- CLN.BOX_INVESTMENT_DATA.CLN_ATLANTIC_AVIATION_FIN_PL_MONTHLY.
 -- Fact table: OfficeConnect quarterly template, entity x line item x month.
 -- Identity form: wide by category, 3 branches (ACTUAL_AMOUNT, FORECAST_AMOUNT,
 -- BUDGET_AMOUNT), nulls kept: count(staged) = count(source) x 3.
@@ -26,6 +26,8 @@ $$
 -- MPG, Landings, Trips. Values stay as booked here; XFRM applies the scale.
 -- SOURCE_LINE_KEY: ENTITY|SECTION|LINE_ITEM|PERIOD_DATE|branch, unique (M1).
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried verbatim.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -37,7 +39,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_ATLANTIC_AVIATION_OC_DATA
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_ATLANTIC_AVIATION_FIN_PL_MONTHLY)
     )
     -- ------------------------------------------------------------------------
     -- unpivot by category: one branch per measure column, nulls kept
@@ -88,7 +90,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'ATLANTIC_AVIATION'::varchar                                                     as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_ATLANTIC_AVIATION_OC_DATA'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_ATLANTIC_AVIATION_FIN_PL_MONTHLY'::varchar as source_table
         , nullif(trim(cln.entity), '')::varchar                                    as source_site_code
         , cln.entity::varchar                                                      as asset_name
         , nullif(trim(cln.section), '')::varchar                                    as department

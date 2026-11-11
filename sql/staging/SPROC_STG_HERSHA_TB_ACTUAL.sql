@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_HERSHA_TB_ACTUAL
 -- Builds STAGING.STG_HERSHA_TB_ACTUAL from
--- CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_TB_ACTUAL.
+-- CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_TRIAL_BALANCE.
 -- Fact table (build 10 Q-01, Q-05): the HERSHA ACTUAL source for the 12 hotels it
 -- carries; its FORECAST branch is routed to UNKNOWN by SPROC_XFRM_HERSHA (Q-06).
 -- FLAG_COL_1 / FLAG_COL_2 are carried here, in staging only (Q-07).
@@ -24,6 +24,8 @@ $$
 -- FORECAST_AMOUNT: the source names no scenario (D-45, build 06 Q-03).
 -- Build 15 (D-50): SOURCE_SIGN_CONVENTION DEBIT for every row, with its evidence
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -35,7 +37,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_TB_ACTUAL
+        from (select source_folder, portfolio_name as property_name, * exclude (source_folder) from CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_TRIAL_BALANCE)
     )
     -- ------------------------------------------------------------------------
     -- unpivot by category: one branch per measure pair, nulls kept
@@ -48,7 +50,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'HERSHA'::varchar                                                     as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_TB_ACTUAL'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_TRIAL_BALANCE'::varchar as source_table
         , nullif(trim(unp.company_id), '')::varchar                             as source_site_code
         , unp.company_name::varchar                                             as asset_name
         , nullif(trim(unp.department_code), '')::varchar                        as department

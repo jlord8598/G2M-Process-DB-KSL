@@ -7,7 +7,7 @@ $$
 -- ============================================================================
 -- SPROC_STG_HHG_FORECAST_ANAPLAN
 -- Builds STAGING.STG_HHG_FORECAST_ANAPLAN from
--- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN. Fact table.
+-- CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS. Fact table.
 -- Identity form: long. count(source) = count(staged).
 -- Lossless: no filter, no aggregation, no repair. Raw columns carried
 -- verbatim; standard columns derived alongside (docs/sources.md).
@@ -20,6 +20,8 @@ $$
 -- cells (M1): IS_SUBTOTAL true there (Q-05).
 -- Build 15 (D-50): SOURCE_SIGN_CONVENTION PROFIT for every row, with its evidence
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
+-- Build 16: reads the new table name directly; the old-name view's select
+-- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -31,7 +33,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN
+        from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS)
     )
     -- ------------------------------------------------------------------------
     -- cleaned key inputs
@@ -48,7 +50,7 @@ begin
     select
           :P_RUN_ID::varchar                                                    as run_id
         , 'HHG'::varchar                                                        as source_lane
-        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FORECAST_ANAPLAN'::varchar as source_table
+        , 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS'::varchar as source_table
         , cln.c_site::varchar                                                   as source_site_code
         , cln.location::varchar                                                 as asset_name
         , null::varchar                                                         as department

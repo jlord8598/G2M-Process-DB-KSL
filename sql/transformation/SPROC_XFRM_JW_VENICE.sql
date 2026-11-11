@@ -42,6 +42,8 @@ $$
 --   DEBIT -SOURCE_AMOUNT, PROFIT SOURCE_AMOUNT, PRESENTED SOURCE_AMOUNT x
 --   VALUE_SIGN; null wherever VALUE_SIGN is null. This lane: PRESENTED (every table).
 --   SOURCE_SIGN_CONVENTION and its source are carried on every stream.
+-- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
+-- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
 -- ============================================================================
 declare
     v_is  integer;
@@ -133,7 +135,7 @@ begin
             , coalesce(fact.measure_column, '~BLANK~') as category_input
             , (case
                   when not fact.is_mpd
-                   and fact.source_table in ('CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FCAST_ACT_FORECAST', 'CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FCAST_BY_PERIOD')
+                   and fact.source_table in ('CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FIN_PL_SUMMARY', 'CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_FIN_PL_SUMMARY')
                    and fact.measure_column = 'ACTUAL'
                    and fact.period_end in ('2025-08-31'::date, '2026-08-31'::date)  then true
                   when fact.is_mpd and fact.period_type = 'YTD'                   then true
