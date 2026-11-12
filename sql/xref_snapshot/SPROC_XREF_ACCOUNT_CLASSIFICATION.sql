@@ -555,6 +555,11 @@ begin
         --   ACCOUNT_CODE is TR12's, so it takes the same COA / digit rules. A key
         --   both tables carry is extracted once (MIN(source_table) = BUDGET_BY_CLUB,
         --   same rules, same result).
+        -- Build 19 (owner Q-03, D-44): MEMBERSHIP_MONTHLY added as a fact. Its
+        --   coded rows carry the budget's 999-94xxx / 95xxx ACCOUNT_CODE (same key,
+        --   MIN(source_table) = BUDGET_BY_CLUB, same result); its 'Ending Member
+        --   Count' rows (no account, key MEMBER_LINE_KEY | CLUB_SEGMENT) are
+        --   Statistic with H2 = the source's LINE_DESCRIPTION (D-38).
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -582,6 +587,11 @@ begin
                      , asset_name, department_name, account_number, stat_account, account_desc
                      , source_table, stat_unit_family
                 from DEV_G2M_AI.STAGING.STG_HHG_BUDGET_BY_CLUB
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , source_table, stat_unit_family
+                from DEV_G2M_AI.STAGING.STG_HHG_MEMBERSHIP_MONTHLY
             )
             -- ----------------------------------------------------------------
             -- extract: one row per five-part key, attributes by MIN()
@@ -722,6 +732,9 @@ begin
                     , case
                           when k_rtype = 'STATISTIC'
                                and src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY' then 'ROUNDS_COUNT'
+                          when k_rtype = 'STATISTIC'
+                               and src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_MEMBERSHIP_MONTHLY'
+                               and account_number is null        then account_desc
                           when k_rtype = 'STATISTIC'             then 'STAT_9'
                           when t_map is not null                 then split_part(t_map, '|', 2)
                           when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS'
@@ -741,6 +754,10 @@ begin
                           when k_rtype = 'STATISTIC'
                                and src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY'
                               then 'RECORD_TYPE STATISTIC; H2 = ROUNDS_COUNT, the source column name (Q-07)'
+                          when k_rtype = 'STATISTIC'
+                               and src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_MEMBERSHIP_MONTHLY'
+                               and account_number is null
+                              then 'RECORD_TYPE STATISTIC (member count, build 19 Q-03); H2 = LINE_DESCRIPTION, the source label (D-38)'
                           when k_rtype = 'STATISTIC'
                               then 'RECORD_TYPE STATISTIC (dept 999, owner Q-01); H2 = STAT_9, section code, no family stated'
                           when t_map is not null and nat in ('51050', '51060') and t_type = 'Revenue'
@@ -1549,8 +1566,10 @@ begin
 
     elseif (:P_LANE = 'DAVIDSON') then
         -- ====================================================================
-        -- LANE DAVIDSON (build 06)
-        -- Facts: HOTEL_MONTHLY_REPORT (MR), FULL_YEAR_PL (PL).
+        -- LANE DAVIDSON (build 06; rebuilt build 19, D-44)
+        -- Facts: HOTEL_MONTHLY_REPORT (MR), FULL_YEAR_PL (PL), HOTEL_BUDGET (build 19,
+        --   owner Q-11: same account layout as MR, so its keys take the MR rules;
+        --   for rule selection a budget row reads as MR).
         -- STATISTIC: H1 Statistic first. H2 is the source's own code: the MR
         --   natural account (9000-9990, owner Q-07), else the MR LINE_CLASS
         --   (ADR, Rooms) or the PL line text (D-38). 9990 is a stat-ledger
@@ -1585,6 +1604,12 @@ begin
                      , asset_name, department_name, account_number, stat_account, account_desc
                      , source_table, null::varchar as natural_account
                 from DEV_G2M_AI.STAGING.STG_DAVIDSON_FULL_YEAR_PL
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY'::varchar as source_table
+                     , natural_account
+                from DEV_G2M_AI.STAGING.STG_DAVIDSON_HOTEL_BUDGET
             )
             -- ----------------------------------------------------------------
             -- extract: one row per five-part key, attributes by MIN()
@@ -2104,6 +2129,8 @@ begin
         --   Statistic, H2 = the source section; FCAST_BY_PERIOD's EBITDA EXCLUDING
         --   OWNER EXPENSES is a computed line in staging (Q-16 tie test) and takes
         --   the subtotal rule. Guarded D-44 re-seed of those 3 keys.
+        -- Build 19 (owner Q-10): CAPEX added as a fact; its keys are Statistic,
+        --   H2 FIN_CAPEX, METRIC_UNIT CURRENCY, AGGREGATION_TYPE FLOW.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -2114,28 +2141,33 @@ begin
             fact as (
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , is_subtotal, subtotal_source, false as is_mpd
+                     , is_subtotal, subtotal_source, false as is_mpd, false as is_capex
                 from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_ACT_FORECAST
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , is_subtotal, subtotal_source, false as is_mpd
+                     , is_subtotal, subtotal_source, false as is_mpd, false as is_capex
                 from DEV_G2M_AI.STAGING.STG_JW_VENICE_FCAST_BY_PERIOD
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , is_subtotal, subtotal_source, false as is_mpd
+                     , is_subtotal, subtotal_source, false as is_mpd, false as is_capex
                 from DEV_G2M_AI.STAGING.STG_JW_VENICE_FTE
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , is_subtotal, subtotal_source, false as is_mpd
+                     , is_subtotal, subtotal_source, false as is_mpd, false as is_capex
                 from DEV_G2M_AI.STAGING.STG_JW_VENICE_HEADCOUNT
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , is_subtotal, subtotal_source, true as is_mpd
+                     , is_subtotal, subtotal_source, true as is_mpd, false as is_capex
                 from DEV_G2M_AI.STAGING.STG_JW_VENICE_MONTHLY_PL_DEPT
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , is_subtotal, subtotal_source, false as is_mpd, true as is_capex
+                from DEV_G2M_AI.STAGING.STG_JW_VENICE_CAPEX
             )
             -- ----------------------------------------------------------------
             -- extract: one row per five-part key, attributes by MIN()
@@ -2155,6 +2187,7 @@ begin
                     , boolor_agg(is_subtotal)                                 as m_subtotal
                     , min(subtotal_source)                                    as m_subtotal_source
                     , boolor_agg(is_mpd)                                      as m_mpd
+                    , boolor_agg(is_capex)                                    as is_capex
                     , split_part(min(account_key), ' | ', 1)                  as m_code
                 from fact
                 where 1=1
@@ -2217,6 +2250,18 @@ begin
                       end as seed_source
                 from cls0
             )
+            -- ----------------------------------------------------------------
+            -- capex keys (build 19, owner Q-10): CAPEX rows only; no capex key
+            -- (site | ~BLANK~ | vendor | AMOUNT) is shared with another fact
+            -- ----------------------------------------------------------------
+            , cls2 as (
+                select * replace (
+                      iff(is_capex, 'Statistic', h1)  as h1
+                    , iff(is_capex, 'FIN_CAPEX', h2)  as h2
+                    , iff(is_capex, 'FIN_CAPEX (build 19, owner Q-10): capital spend never enters the P&L; H1 Statistic, amount kept as AMOUNT, METRIC_UNIT CURRENCY, AGGREGATION_TYPE FLOW (B09-D4 / build 18 pattern)', seed_source) as seed_source
+                )
+                from cls
+            )
             select
                   k_lane, k_site, k_dept, k_acct, k_rtype
                 , asset_name, department_name, account_number, stat_account, account_desc
@@ -2244,13 +2289,13 @@ begin
                       when 'Payroll'                  then -1
                       when 'Operating Expenses'       then -1
                   end::number(2,0) as value_sign
-                , null::varchar as metric_unit
-                , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
+                , iff(is_capex, 'CURRENCY', null)::varchar as metric_unit
+                , case when h1 = 'Statistic' then iff(is_capex, 'FLOW', 'UNRATIFIED') end as aggregation_type
                 , seed_source
                 , (not m_mpd and k_rtype = 'AMOUNT'
                    and (k_acct = 'GOP MARGIN'
                         or (k_dept = 'UNDISTRIBUTED OPERATING EXP' and k_acct = 'EBITDA EXCLUDING OWNER EXPENSES'))) as reseed_block
-            from cls
+            from cls2
         ) src
             on  tgt.source_lane      = src.k_lane
             and tgt.source_site_code = src.k_site

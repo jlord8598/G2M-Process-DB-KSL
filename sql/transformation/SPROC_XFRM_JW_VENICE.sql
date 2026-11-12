@@ -33,7 +33,10 @@ $$
 --          GL-account rows are the detail;
 --   (Q-11) MONTHLY_PL_DEPT repeated 98xxxx hours block ('<code> | <text> | #n'):
 --          the first block beats it.
--- Pacing: the lane has no pacing source (M1); built empty.
+-- Pacing (build 19, owner item 11): PACE_OTB_DAILY and PACE_SEGMENT_MONTHLY
+--   (as-of SNAPSHOT_DATE), unioned in their own columns.
+-- Build 19 (owner Q-10): CAPEX added as a fact (MEASURE_COLUMN ACTUAL -> ACTUAL);
+--   its keys are Statistic / FIN_CAPEX, so it routes to operating metrics.
 -- SCENARIO is carried verbatim; category never replaces it (D-17).
 -- SOURCE_AMOUNT and STAT_VALUE unchanged.
 -- No filter, no aggregation. The scratch table is dropped before return.
@@ -119,6 +122,14 @@ begin
              , source_sign_convention, source_sign_convention_source
              , true as is_mpd, period_type::varchar as period_type
         from DEV_G2M_AI.STAGING.STG_JW_VENICE_MONTHLY_PL_DEPT
+        union all
+        select source_lane, source_site_code, asset_name, department, department_name
+             , account_number, stat_account, account_key, record_type, record_type_source
+             , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
+             , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , source_sign_convention, source_sign_convention_source
+             , false as is_mpd, null::varchar as period_type
+        from DEV_G2M_AI.STAGING.STG_JW_VENICE_CAPEX
     )
     -- ------------------------------------------------------------------------
     -- category, row by row, from the branch; D-48 flag
@@ -264,13 +275,64 @@ begin
            or h1 not in ('Revenue', 'Expense', 'Below the Line', 'Allocations & Reserves', 'Balance Sheet', 'Statistic'));
 
     -- ------------------------------------------------------------------------
-    -- pacing: the lane has no pacing source (M1); the stream is built empty
+    -- pacing: routed on source, own columns (D-24), never classified; the
+    -- union of the lane's pace tables, a typed null where a table lacks a
+    -- column (build 19: PACE_OTB_DAILY, PACE_SEGMENT_MONTHLY)
     -- ------------------------------------------------------------------------
-    create or replace table DEV_G2M_AI.TRANSFORMATION.XFRM_JW_VENICE_PACING (
-          run_id        varchar
-        , source_lane   varchar
-        , source_table  varchar
-    );
+    create or replace table DEV_G2M_AI.TRANSFORMATION.XFRM_JW_VENICE_PACING as
+    select
+          :P_RUN_ID::varchar as run_id
+        , source_lane::varchar as source_lane
+        , source_table::varchar as source_table
+        , source_folder::varchar as source_folder
+        , property_name::varchar as property_name
+        , snapshot_date::date as snapshot_date
+        , stay_date::date as stay_date
+        , day_of_week::varchar as day_of_week
+        , occupancy::number(38,6) as occupancy
+        , rooms_transient::number(38,6) as rooms_transient
+        , rooms_group_deduct::number(38,6) as rooms_group_deduct
+        , rooms_comp_house::number(38,6) as rooms_comp_house
+        , rooms_total::number(38,6) as rooms_total
+        , null::varchar as report_block
+        , null::varchar as market_segment
+        , null::date as stay_month
+        , null::number(38,6) as room_nights
+        , null::number(38,6) as room_revenue
+        , null::number(38,6) as adr
+        , null::varchar as source_tab
+        , file_date::timestamp_tz as file_date
+        , source_file_path::varchar as source_file_path
+        , source_row_number::number(38,0) as source_row_number
+    from DEV_G2M_AI.STAGING.STG_JW_VENICE_PACE_OTB_DAILY
+    where 1=1
+    union all
+    select
+          :P_RUN_ID::varchar as run_id
+        , source_lane::varchar as source_lane
+        , source_table::varchar as source_table
+        , source_folder::varchar as source_folder
+        , property_name::varchar as property_name
+        , snapshot_date::date as snapshot_date
+        , null::date as stay_date
+        , null::varchar as day_of_week
+        , null::number(38,6) as occupancy
+        , null::number(38,6) as rooms_transient
+        , null::number(38,6) as rooms_group_deduct
+        , null::number(38,6) as rooms_comp_house
+        , null::number(38,6) as rooms_total
+        , report_block::varchar as report_block
+        , market_segment::varchar as market_segment
+        , stay_month::date as stay_month
+        , room_nights::number(38,6) as room_nights
+        , room_revenue::number(38,6) as room_revenue
+        , adr::number(38,6) as adr
+        , source_tab::varchar as source_tab
+        , file_date::timestamp_tz as file_date
+        , source_file_path::varchar as source_file_path
+        , source_row_number::number(38,0) as source_row_number
+    from DEV_G2M_AI.STAGING.STG_JW_VENICE_PACE_SEGMENT_MONTHLY
+    where 1=1;
 
     drop table DEV_G2M_AI.TRANSFORMATION.TMP_XFRM_JW_VENICE_ROWS;
 

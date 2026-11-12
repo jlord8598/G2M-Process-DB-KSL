@@ -35,6 +35,14 @@ $$
 --   SOURCE_SIGN_CONVENTION and its source are carried on every stream.
 -- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
 -- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
+-- Build 19 (owner Q-05, Q-06, Q-07):
+--   BUDGET branch of GL_ACTUAL -> category BUDGET (DEBIT, D-50).
+--   D-48: within CLN_HERSHA_OPS_STATS_MONTHLY, PREFERRED_ROW true beats false;
+--   the non-preferred rows go to UNKNOWN as DUPLICATE_DETAIL.
+--   D-48 cross-lane: for COMPANY_ID 149 (Cadillac) and 230 (Parrot Key), DAVIDSON
+--   (RMICAD, RINPKR) is the source for ACTUAL, FORECAST and BUDGET in 2026 (Q-15); those HERSHA
+--   rows go to UNKNOWN as DUPLICATE_DETAIL, applied by site and year here alone
+--   (this procedure reads no other lane).
 -- ============================================================================
 declare
     v_is  integer;
@@ -76,6 +84,7 @@ begin
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
              , source_sign_convention, source_sign_convention_source
+             , null::boolean as preferred_row
         from DEV_G2M_AI.STAGING.STG_HERSHA_GL_ACTUAL
         union all
         select source_lane, source_site_code, asset_name, department, department_name
@@ -83,6 +92,7 @@ begin
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
              , source_sign_convention, source_sign_convention_source
+             , preferred_row
         from DEV_G2M_AI.STAGING.STG_HERSHA_GL_STAT
         union all
         select source_lane, source_site_code, asset_name, department, department_name
@@ -90,6 +100,7 @@ begin
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
              , source_sign_convention, source_sign_convention_source
+             , null::boolean as preferred_row
         from DEV_G2M_AI.STAGING.STG_HERSHA_TB_ACTUAL
     )
     -- ------------------------------------------------------------------------
@@ -108,13 +119,22 @@ begin
             , case
                   when fact.measure_column = 'ACTUAL'   then 'ACTUAL'
                   when fact.measure_column = 'FORECAST' then 'FORECAST'
+                  when fact.measure_column = 'BUDGET'   then 'BUDGET'
               end as category
             , coalesce(fact.measure_column, '~BLANK~') as category_input
             , (    (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_PL_MONTHLY'
                     and fact.measure_column = 'ACTUAL'
                     and tb_site.tb_site_code is not null)
                 or (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_TRIAL_BALANCE'
-                    and fact.measure_column = 'FORECAST'))::boolean as d48_loses
+                    and fact.measure_column = 'FORECAST')
+                -- build 19: non-preferred OPS_STATS rows lose to the preferred row
+                or (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_OPS_STATS_MONTHLY'
+                    and fact.preferred_row = false)
+                -- build 19 cross-lane: DAVIDSON is the source for 149 / 230 in 2026,
+                -- actual, forecast and budget (owner Q-05, Q-15)
+                or (fact.source_site_code in ('149', '230')
+                    and year(fact.period_end) = 2026
+                    and fact.measure_column in ('ACTUAL', 'FORECAST', 'BUDGET')))::boolean as d48_loses
         from fact
         left join tb_site
             on  tb_site.tb_site_code = fact.source_site_code

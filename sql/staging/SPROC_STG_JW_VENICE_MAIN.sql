@@ -39,6 +39,18 @@ begin
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 
+    call DEV_G2M_AI.STAGING.SPROC_STG_JW_VENICE_CAPEX(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_JW_VENICE_PACE_OTB_DAILY(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_JW_VENICE_PACE_SEGMENT_MONTHLY(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
     -- ------------------------------------------------------------------------
     -- model calls: lane dictionaries
     -- ------------------------------------------------------------------------

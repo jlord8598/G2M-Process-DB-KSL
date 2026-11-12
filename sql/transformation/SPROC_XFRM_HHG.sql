@@ -37,6 +37,11 @@ $$
 --   keeping H1-H5.
 -- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
 -- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
+-- Build 19 (owner Q-03): STG_HHG_MEMBERSHIP_MONTHLY added; category BUDGET.
+--   D-48: where FIN_BUDGET_MONTHLY carries the same club, month and account
+--   (the 999-94xxx / 95xxx member accounts), the budget row wins and the
+--   membership row goes to UNKNOWN as DUPLICATE_DETAIL. 'Ending Member Count'
+--   (no account) has no twin and stays in operating metrics.
 -- ============================================================================
 declare
     v_is  integer;
@@ -100,6 +105,20 @@ begin
              , is_subtotal, subtotal_source, source_line_key, source_table
              , source_sign_convention, source_sign_convention_source, file_date
         from DEV_G2M_AI.STAGING.STG_HHG_BUDGET_BY_CLUB
+        union all
+        select source_lane, source_site_code, asset_name, department, department_name
+             , account_number, stat_account, account_key, record_type, record_type_source
+             , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
+             , is_subtotal, subtotal_source, source_line_key, source_table
+             , source_sign_convention, source_sign_convention_source, file_date
+        from DEV_G2M_AI.STAGING.STG_HHG_MEMBERSHIP_MONTHLY
+    )
+    -- ------------------------------------------------------------------------
+    -- club + month + account the budget carries (D-48, build 19)
+    -- ------------------------------------------------------------------------
+    , bud_key as (
+        select distinct source_site_code as b_site, period_end as b_period, account_key as b_acct
+        from DEV_G2M_AI.STAGING.STG_HHG_BUDGET_BY_CLUB
     )
     -- ------------------------------------------------------------------------
     -- category, row by row
@@ -119,6 +138,8 @@ begin
                   when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_BUDGET_MONTHLY'
                        and fact.scenario = 'FINAL: Budget Amount'
                       then 'BUDGET'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_MEMBERSHIP_MONTHLY'
+                      then 'BUDGET'
               end as category
             , case
                   when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_ROUNDS_DAILY' then fact.source_table
@@ -126,8 +147,14 @@ begin
               end as category_input
             , (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS'
                and fact.file_date < max(iff(fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_FIN_FORECAST_VERSIONS', fact.file_date, null))
-                                      over (partition by fact.source_table, fact.source_site_code, fact.period_end, fact.scenario))::boolean as d48_loses
+                                      over (partition by fact.source_table, fact.source_site_code, fact.period_end, fact.scenario)
+               or (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_OPS_MEMBERSHIP_MONTHLY'
+                   and bud_key.b_acct is not null))::boolean as d48_loses
         from fact
+        left join bud_key
+            on  bud_key.b_site   = fact.source_site_code
+            and bud_key.b_period = fact.period_end
+            and bud_key.b_acct   = fact.account_key
         where 1=1
     )
     -- ------------------------------------------------------------------------

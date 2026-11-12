@@ -28,6 +28,12 @@ $$
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- Build 16: reads the new table name directly; the old-name view's select
 -- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
+-- Build 19 (owner Q-02, Q-14: a rule, not an account list): where the
+-- dictionary gives no description, ACCOUNT_DESC is the natural account's
+-- (segment 3) description in the whole chart of accounts
+-- (CLN_HERITAGE_GOLF_REF_ACCOUNTS), only where that chart gives exactly one
+-- description for it; else null. ACCOUNT_DESC_SOURCE says which. Same rule as
+-- SPROC_STG_HHG_TR12_DATA. Fills 9108-905 (12 rows at build 19).
 -- ============================================================================
 declare
     v_rows integer;
@@ -67,6 +73,20 @@ begin
         from (select *, portfolio_name as property_name from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_ACCOUNTS) a
     )
     -- ------------------------------------------------------------------------
+    -- natural-account description, only where the chart gives exactly one
+    -- (build 19 Q-02, Q-14)
+    -- ------------------------------------------------------------------------
+    , nat as (
+        select
+              split_part(a.full_account_string, '-', 3) as natural_account
+            , min(a.account_description)                as account_description
+        from CLN.BOX_INVESTMENT_DATA.CLN_HERITAGE_GOLF_REF_ACCOUNTS a
+        where 1=1
+          and nullif(trim(a.account_description), '') is not null
+        group by split_part(a.full_account_string, '-', 3)
+        having count(distinct a.account_description) = 1
+    )
+    -- ------------------------------------------------------------------------
     -- club name by GL entity, unique on CLUB_NUMBER (build 10 M1)
     -- ------------------------------------------------------------------------
     , refs as (
@@ -101,7 +121,11 @@ begin
               else 'department not 999: AMOUNT (no stating column; M1)'
           end::varchar                                                          as record_type_source
         , null::varchar                                                         as stat_unit_family
-        , acct.account_description::varchar                                     as account_desc
+        , coalesce(acct.account_description, nat.account_description)::varchar as account_desc
+        , case
+              when acct.account_description is not null then 'ACCOUNTS dictionary, full account string'
+              when nat.account_description is not null  then 'chart of accounts, natural account ' || split_part(cln.account_code, '-', 3) || ' (one description; build 19 Q-02, Q-14)'
+          end::varchar                                                          as account_desc_source
         , cln.period_date::date                                                 as period_end
         , cln.budget_version::varchar                                           as scenario
         , iff(cln.c_dept = '999', null, cln.budget_amount)::float               as source_amount
@@ -138,6 +162,8 @@ begin
     left join acct
         on  acct.full_account_string = cln.account_code
         and acct.source_table = 'CLN_HERITAGE_GOLF_FIN_BUDGET_MONTHLY'
+    left join nat
+        on  nat.natural_account = split_part(cln.account_code, '-', 3)
     left join refs
         on  refs.club_number = cln.c_site
     where 1=1;

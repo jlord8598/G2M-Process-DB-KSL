@@ -17,6 +17,12 @@ $$
 -- BEAUMIER OCCUPANCY* = ROOMS (owner Q-02); KSL / PEREGRINE EVENTS QTY
 -- 'COUNT', additive: the source states no unit (owner Q-10, N-43).
 -- IS_LATEST_SNAPSHOT: SNAPSHOT_DATE = max per lane, site and source table.
+-- Build 19 (owner item 11): JW_VENICE added, two blocks. PACE_OTB_DAILY: DAY
+-- grain, OCCUPANCY RATIO not additive (values to 1.99, N-47), room counts ROOMS;
+-- SOURCE_LINE_KEY file | row. PACE_SEGMENT_MONTHLY: MONTH grain, VANTAGE =
+-- REPORT_BLOCK (OTB / PICK-UP), ROOM_NIGHTS ROOMS, ROOM_REVENUE CURRENCY, ADR RATE
+-- not additive; SOURCE_LINE_KEY SNAPSHOT_DATE | REPORT_BLOCK | MARKET_SEGMENT |
+-- STAY_MONTH (file | row is not unique on this wide sheet, M3).
 -- SNAPSHOT_DATE: BEAUMIER FILE_DATE (Q-02; BUSINESS_DATE in ATTRIBUTES);
 -- EVENTS stay = EVENT_DATE, STAY_GRAIN 'EVENT' (Q-04).
 -- SOURCE_LINE_KEY: SOURCE_FILE_PATH | SOURCE_ROW_NUMBER (unique, M3); null for
@@ -268,7 +274,146 @@ begin
            or value is not null)
     -- END LANE BEAUMIER
     union all
-    -- BEGIN LANE KSL_SELECT_SERVICE
+    -- BEGIN LANE JW_VENICE
+    -- block 1: CLN_JW_VENICE_PACE_OTB_DAILY (OTB by stay date; no vantage column)
+    select
+          :P_RUN_ID::varchar                as run_id
+        , source_lane::varchar              as source_lane
+        , site::varchar                     as site
+        , site_name::varchar                as site_name
+        , snapshot_date::date               as snapshot_date
+        , snapshot_source::varchar          as snapshot_source
+        , stay_period_start::date           as stay_period_start
+        , stay_period_end::date             as stay_period_end
+        , stay_grain::varchar               as stay_grain
+        , segment::varchar                  as segment
+        , segment_source::varchar           as segment_source
+        , booking_status::varchar           as booking_status
+        , vantage_src::varchar              as vantage
+        , metric_name::varchar              as metric_name
+        , (case metric_name
+            when 'OCCUPANCY' then 'RATIO'
+            when 'ROOMS_TRANSIENT' then 'ROOMS'
+            when 'ROOMS_GROUP_DEDUCT' then 'ROOMS'
+            when 'ROOMS_COMP_HOUSE' then 'ROOMS'
+            when 'ROOMS_TOTAL' then 'ROOMS'
+          end)::varchar as metric_unit
+        , (case metric_name
+            when 'OCCUPANCY' then false
+            when 'ROOMS_TRANSIENT' then true
+            when 'ROOMS_GROUP_DEDUCT' then true
+            when 'ROOMS_COMP_HOUSE' then true
+            when 'ROOMS_TOTAL' then true
+          end)::boolean as is_additive
+        , value::float                      as value
+        , iff((case metric_name
+            when 'OCCUPANCY' then 'RATIO'
+            when 'ROOMS_TRANSIENT' then 'ROOMS'
+            when 'ROOMS_GROUP_DEDUCT' then 'ROOMS'
+            when 'ROOMS_COMP_HOUSE' then 'ROOMS'
+            when 'ROOMS_TOTAL' then 'ROOMS'
+          end) in ('CURRENCY', 'RATE'), currency_code, null)::varchar as currency_code
+        , (snapshot_date = max(snapshot_date) over (partition by site, source_table))::boolean as is_latest_snapshot
+        , source_table::varchar             as source_table
+        , source_line_key::varchar          as source_line_key
+        , attributes::object                as attributes
+    from (
+        select
+              source_lane
+            , source_table
+            , property_name as site
+            , null as site_name
+            , snapshot_date as snapshot_date
+            , 'SNAPSHOT_DATE' as snapshot_source
+            , stay_date as stay_period_start
+            , stay_date as stay_period_end
+            , 'DAY' as stay_grain
+            , null as segment
+            , null as segment_source
+            , null as vantage_src
+            , source_file_path || '|' || source_row_number as source_line_key
+            , null as booking_status
+            , 'USD' as currency_code
+            , object_delete(object_construct_keep_null(*), 'RUN_ID', 'OCCUPANCY', 'ROOMS_TRANSIENT', 'ROOMS_GROUP_DEDUCT', 'ROOMS_COMP_HOUSE', 'ROOMS_TOTAL') as attributes
+            , OCCUPANCY::float as OCCUPANCY
+            , ROOMS_TRANSIENT::float as ROOMS_TRANSIENT
+            , ROOMS_GROUP_DEDUCT::float as ROOMS_GROUP_DEDUCT
+            , ROOMS_COMP_HOUSE::float as ROOMS_COMP_HOUSE
+            , ROOMS_TOTAL::float as ROOMS_TOTAL
+        from DEV_G2M_AI.TRANSFORMATION.XFRM_JW_VENICE_PACING
+        where 1=1
+          -- this block reads only its own table's rows (the other block reads the rest)
+          and source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_PACE_OTB_DAILY'
+    ) unpivot include nulls (value for metric_name in (OCCUPANCY, ROOMS_TRANSIENT, ROOMS_GROUP_DEDUCT, ROOMS_COMP_HOUSE, ROOMS_TOTAL))
+    where 1=1
+    union all
+    -- block 2: CLN_JW_VENICE_PACE_SEGMENT_MONTHLY (VANTAGE = REPORT_BLOCK, OTB / PICK-UP)
+    select
+          :P_RUN_ID::varchar                as run_id
+        , source_lane::varchar              as source_lane
+        , site::varchar                     as site
+        , site_name::varchar                as site_name
+        , snapshot_date::date               as snapshot_date
+        , snapshot_source::varchar          as snapshot_source
+        , stay_period_start::date           as stay_period_start
+        , stay_period_end::date             as stay_period_end
+        , stay_grain::varchar               as stay_grain
+        , segment::varchar                  as segment
+        , segment_source::varchar           as segment_source
+        , booking_status::varchar           as booking_status
+        , vantage_src::varchar              as vantage
+        , metric_name::varchar              as metric_name
+        , (case metric_name
+            when 'ROOM_NIGHTS' then 'ROOMS'
+            when 'ROOM_REVENUE' then 'CURRENCY'
+            when 'ADR' then 'RATE'
+          end)::varchar as metric_unit
+        , (case metric_name
+            when 'ROOM_NIGHTS' then true
+            when 'ROOM_REVENUE' then true
+            when 'ADR' then false
+          end)::boolean as is_additive
+        , value::float                      as value
+        , iff((case metric_name
+            when 'ROOM_NIGHTS' then 'ROOMS'
+            when 'ROOM_REVENUE' then 'CURRENCY'
+            when 'ADR' then 'RATE'
+          end) in ('CURRENCY', 'RATE'), currency_code, null)::varchar as currency_code
+        , (snapshot_date = max(snapshot_date) over (partition by site, source_table))::boolean as is_latest_snapshot
+        , source_table::varchar             as source_table
+        , source_line_key::varchar          as source_line_key
+        , attributes::object                as attributes
+    from (
+        select
+              source_lane
+            , source_table
+            , property_name as site
+            , null as site_name
+            , snapshot_date as snapshot_date
+            , 'SNAPSHOT_DATE' as snapshot_source
+            , date_trunc('month', stay_month) as stay_period_start
+            , stay_month as stay_period_end
+            , 'MONTH' as stay_grain
+            , market_segment as segment
+            , 'MARKET_SEGMENT' as segment_source
+            , report_block as vantage_src
+            , snapshot_date || '|' || report_block || '|' || market_segment || '|' || stay_month as source_line_key
+            , null as booking_status
+            , 'USD' as currency_code
+            , object_delete(object_construct_keep_null(*), 'RUN_ID', 'ROOM_NIGHTS', 'ROOM_REVENUE', 'ADR') as attributes
+            , ROOM_NIGHTS::float as ROOM_NIGHTS
+            , ROOM_REVENUE::float as ROOM_REVENUE
+            , ADR::float as ADR
+        from DEV_G2M_AI.TRANSFORMATION.XFRM_JW_VENICE_PACING
+        where 1=1
+          -- this block reads only its own table's rows (the other block reads the rest)
+          and source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_JW_VENICE_PACE_SEGMENT_MONTHLY'
+    ) unpivot include nulls (value for metric_name in (ROOM_NIGHTS, ROOM_REVENUE, ADR))
+    where 1=1
+    -- END LANE JW_VENICE
+    union all
+    
+-- BEGIN LANE KSL_SELECT_SERVICE
     select
           :P_RUN_ID::varchar                as run_id
         , source_lane::varchar              as source_lane

@@ -24,6 +24,8 @@ $$
 -- VALUE = SOURCE_AMOUNT * VALUE_SIGN. SOURCE_AMOUNT and STAT_VALUE unchanged.
 -- No filter, no aggregation. The scratch table is dropped before return.
 -- Built from the lane-independent text of SPROC_XFRM_DAVIDSON (build 06).
+-- Build 19 (owner Q-11): STG_DAVIDSON_HOTEL_BUDGET added to the fact union;
+--   MEASURE_COLUMN BUDGET -> category BUDGET (2026 and 2027 budgets).
 -- ============================================================================
 declare
     v_is  integer;
@@ -71,6 +73,12 @@ begin
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
         from DEV_G2M_AI.STAGING.STG_DAVIDSON_FULL_YEAR_PL
+        union all
+        select source_lane, source_site_code, asset_name, department, department_name
+             , account_number, stat_account, account_key, record_type, record_type_source
+             , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
+             , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+        from DEV_G2M_AI.STAGING.STG_DAVIDSON_HOTEL_BUDGET
     )
     -- ------------------------------------------------------------------------
     -- category, row by row
@@ -81,6 +89,7 @@ begin
             , case
                   when fact.measure_column = 'ACTUAL'   then 'ACTUAL'
                   when fact.measure_column = 'FORECAST' then 'FORECAST'
+                  when fact.measure_column = 'BUDGET'   then 'BUDGET'
               end as category
             , coalesce(fact.measure_column, '~BLANK~') as category_input
         from fact

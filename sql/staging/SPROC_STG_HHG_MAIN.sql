@@ -68,6 +68,10 @@ begin
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 
+    call DEV_G2M_AI.STAGING.SPROC_STG_HHG_MEMBERSHIP_MONTHLY(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
     return 'SPROC_STG_HHG_MAIN ' || v_run_id || ' models=' || v_models || v_log;
 end;
 $$;

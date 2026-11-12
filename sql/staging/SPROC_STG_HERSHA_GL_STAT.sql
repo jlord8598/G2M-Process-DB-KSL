@@ -23,8 +23,11 @@ $$
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- Build 16: reads the new table name directly; the old-name view's select
 -- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
--- TEMPORARY (build 16 Q-02, one-build exception to invariant 1): the old
--- view's own WHERE, kept as written. Rows it leaves unread: N-37 (1,798 non-preferred rows).
+-- Build 19 (owner Q-07, N-37): the build 16 temporary WHERE PREFERRED_ROW is
+-- removed; every source row is read. PREFERRED_ROW and SOURCE_OBJECT are carried;
+-- the non-preferred (older forecast-stat) rows lose to the preferred row under
+-- D-48 in transformation. SOURCE_LINE_KEY adds PREFERRED_ROW: the 7 dimensions
+-- are unique only with it (11,222 / 11,222, build 19 M3).
 -- ============================================================================
 declare
     v_rows integer;
@@ -36,7 +39,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from (select source_folder, portfolio_name as property_name, * exclude (source_folder) from CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_OPS_STATS_MONTHLY where preferred_row)
+        from (select source_folder, portfolio_name as property_name, * exclude (source_folder) from CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_OPS_STATS_MONTHLY)
     )
     -- ------------------------------------------------------------------------
     -- unpivot by category: one branch per measure pair, nulls kept
@@ -77,6 +80,7 @@ begin
             || '|' || coalesce(unp.rev_spend_category, '~BLANK~')
             || '|' || coalesce(unp.job_title_code, '~BLANK~')
             || '|' || coalesce(unp.meal_period_code, '~BLANK~')
+            || '|' || iff(unp.preferred_row, 'PREFERRED', 'NOT_PREFERRED')
             || '|' || unp.measure_column)::varchar                             as source_line_key
         , unp.measure_column::varchar                                           as measure_column
         -- --------------------------------------------------------------------
@@ -109,6 +113,8 @@ begin
         , unp.actual_source_row_number
         , unp.forecast_source_file_path
         , unp.forecast_source_row_number
+        , unp.source_object
+        , unp.preferred_row
     from unp
     where 1=1;
 

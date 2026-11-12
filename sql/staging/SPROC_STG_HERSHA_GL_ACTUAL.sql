@@ -9,8 +9,8 @@ $$
 -- Builds STAGING.STG_HERSHA_GL_ACTUAL from
 -- CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_PL_MONTHLY.
 -- Fact table.
--- Identity form: wide by category, 2 branches (ACTUAL_*, FORECAST_*), nulls kept:
--- count(staged) = count(source) x 2. Each branch carries its amount and its
+-- Identity form: wide by category, 3 branches (ACTUAL_*, FORECAST_*, BUDGET_*), nulls
+-- kept: count(staged) = count(source) x 3 (build 19; was x 2). Each branch carries its amount and its
 -- stat on one row (D-29), so money and its statistic stay together.
 -- RECORD_TYPE stated by GL_CODE: Stat -> STATISTIC, else AMOUNT.
 -- STAT_UNIT_FAMILY null: the source states no unit for a stat.
@@ -18,14 +18,15 @@ $$
 -- Site = COMPANY_ID; ASSET_NAME = COMPANY_NAME. Revenue books negative; as booked.
 -- SOURCE_LINE_KEY: the 7 dimension columns unique on the source (M1) plus the
 -- branch; the file path and row are null on a branch whose measure is empty.
--- SCENARIO = the name of the branch's defining measure column, ACTUAL_AMOUNT or
--- FORECAST_AMOUNT: the source names no scenario (D-45, build 06 Q-03).
+-- SCENARIO = the name of the branch's defining measure column, ACTUAL_AMOUNT,
+-- FORECAST_AMOUNT or BUDGET_AMOUNT: the source names no scenario (D-45, build 06 Q-03).
 -- Build 15 (D-50): SOURCE_SIGN_CONVENTION DEBIT for every row, with its evidence
 -- in SOURCE_SIGN_CONVENTION_SOURCE; applied in transformation.
 -- Build 16: reads the new table name directly; the old-name view's select
 -- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
--- TEMPORARY (build 16 Q-02, one-build exception to invariant 1): the old
--- view's own WHERE, kept as written. Rows it leaves unread: N-36 (3,056 budget-only rows).
+-- Build 19 (owner Q-06, N-36): the BUDGET branch is added and the build 16
+-- temporary WHERE is removed; every source row is read. Budget books DEBIT like
+-- actual and forecast (revenue 4xxx -325.0M; 5xxx-7xxx positive; build 19 M1).
 -- ============================================================================
 declare
     v_rows integer;
@@ -37,7 +38,7 @@ begin
     -- ------------------------------------------------------------------------
     src as (
         select *
-        from (select source_folder, portfolio_name as property_name, * exclude (source_folder) from CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_PL_MONTHLY where actual_amount is not null or forecast_amount is not null or actual_stat is not null or forecast_stat is not null)
+        from (select source_folder, portfolio_name as property_name, * exclude (source_folder) from CLN.BOX_INVESTMENT_DATA.CLN_HERSHA_FIN_PL_MONTHLY)
     )
     -- ------------------------------------------------------------------------
     -- unpivot by category: one branch per measure pair, nulls kept
@@ -46,6 +47,8 @@ begin
         select src.*, 'ACTUAL'::varchar   as measure_column, 'ACTUAL_AMOUNT'::varchar   as m_scenario, src.actual_amount   as m_amount, src.actual_stat   as m_stat, src.actual_source_file_path   as m_path, src.actual_source_row_number   as m_row from src
         union all
         select src.*, 'FORECAST'::varchar as measure_column, 'FORECAST_AMOUNT'::varchar as m_scenario, src.forecast_amount as m_amount, src.forecast_stat as m_stat, src.forecast_source_file_path as m_path, src.forecast_source_row_number as m_row from src
+        union all
+        select src.*, 'BUDGET'::varchar   as measure_column, 'BUDGET_AMOUNT'::varchar   as m_scenario, src.budget_amount   as m_amount, src.budget_stat   as m_stat, src.budget_source_file_path   as m_path, src.budget_source_row_number   as m_row from src
     )
     select
           :P_RUN_ID::varchar                                                    as run_id
@@ -101,14 +104,19 @@ begin
         , unp.meal_description
         , unp.actual_amount
         , unp.forecast_amount
+        , unp.budget_amount
         , unp.actual_stat
         , unp.forecast_stat
+        , unp.budget_stat
         , unp.actual_file_date
         , unp.forecast_file_date
+        , unp.budget_file_date
         , unp.actual_source_file_path
         , unp.actual_source_row_number
         , unp.forecast_source_file_path
         , unp.forecast_source_row_number
+        , unp.budget_source_file_path
+        , unp.budget_source_row_number
     from unp
     where 1=1;
 
