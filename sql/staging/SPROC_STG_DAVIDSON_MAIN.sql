@@ -24,6 +24,10 @@ begin
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 
+    call DEV_G2M_AI.STAGING.SPROC_STG_DAVIDSON_ACCOUNT_LOOKUP(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
     -- ------------------------------------------------------------------------
     -- model calls: facts
     -- ------------------------------------------------------------------------
