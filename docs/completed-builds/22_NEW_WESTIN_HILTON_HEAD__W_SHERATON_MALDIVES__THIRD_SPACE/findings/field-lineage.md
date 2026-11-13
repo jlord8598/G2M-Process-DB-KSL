@@ -1,0 +1,17 @@
+# Field lineage (build 22)
+
+| Column | Source | Rule |
+|---|---|---|
+| STG_W_SHERATON_MALDIVES_PL_*.SOURCE_SITE_CODE | HOTEL_CODE | 1GSOD (MONTHLY, SUMMARY), 1BST5 (OWNER) |
+| .DEPARTMENT / ACCOUNT_KEY | SECTION / LINE_ITEM | as JW_VENICE |
+| .PERIOD_TYPE_STD | PERIOD_TYPE | MONTH / YTD; YTD loses D-48 |
+| .SCENARIO / measure | ACTUAL_, FORECAST_, BUDGET_AMOUNT | x3 |
+| .IS_SUBTOTAL | per-table name list + Q-11 / Q-12 / Q-13 | M2, M5 |
+| STG_W_SHERATON_MALDIVES_BALANCE_SHEET.ACCOUNT_KEY / SOURCE_AMOUNT | ACCOUNT_CODE / ACTUAL_BALANCE | long, DEBIT |
+| STG_THIRD_SPACE_PL_MONTHLY.SOURCE_SITE_CODE | ENTITY | clubs and group entities |
+| .DEPARTMENT / ACCOUNT_KEY | SECTION / LINE_ITEM | classified by line name (Q-09) |
+| .REPORT_SHEET | REPORT_SHEET | CLUBS / CORP; CORP twin loses D-48 |
+| .IS_SUBTOTAL | source IS_SUBTOTAL, less the 7 sole totals, plus the EBITDA chain | M3, M5 |
+| *_ACCOUNTS.RAW_SOURCE_TABLE | SOURCE_TABLE | renamed (clash with the lineage column) |
+| SEM_AI_* CURRENCY_CODE | 'USD' Maldives, 'GBP' Third Space | owner assumption Q-06 |
+| SEM_AI_PACING (WESTIN_HILTON_HEAD) | METRIC, AS_OF, OPERATING_UNIT, DEPARTMENT_CODE, AMOUNT | METRIC_NAME, VANTAGE, SITE, SEGMENT, VALUE; unit by *RMS* / *REV*; USD |

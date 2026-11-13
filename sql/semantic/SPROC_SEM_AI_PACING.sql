@@ -17,6 +17,9 @@ $$
 -- BEAUMIER OCCUPANCY* = ROOMS (owner Q-02); KSL / PEREGRINE EVENTS QTY
 -- 'COUNT', additive: the source states no unit (owner Q-10, N-43).
 -- IS_LATEST_SNAPSHOT: SNAPSHOT_DATE = max per lane, site and source table.
+-- Build 22 (owner Q-07): WESTIN_HILTON_HEAD group pace, long (k = 1): METRIC_NAME
+-- = METRIC, VANTAGE = AS_OF (CY / PY), *RMS* ROOMS and *REV* CURRENCY (USD,
+-- owner assumption Q-06), both additive; SOURCE_LINE_KEY file | row | period.
 -- Build 19 (owner item 11): JW_VENICE added, two blocks. PACE_OTB_DAILY: DAY
 -- grain, OCCUPANCY RATIO not additive (values to 1.99, N-47), room counts ROOMS;
 -- SOURCE_LINE_KEY file | row. PACE_SEGMENT_MONTHLY: MONTH grain, VANTAGE =
@@ -411,6 +414,37 @@ begin
     ) unpivot include nulls (value for metric_name in (ROOM_NIGHTS, ROOM_REVENUE, ADR))
     where 1=1
     -- END LANE JW_VENICE
+    union all
+    
+-- BEGIN LANE WESTIN_HILTON_HEAD
+    -- CLN_WESTIN_HILTON_HEAD_PACE_GROUP_MONTHLY is long already (one METRIC per
+    -- line), so k = 1 and no unpivot: METRIC_NAME = METRIC, VALUE = AMOUNT
+    select
+          :P_RUN_ID::varchar                as run_id
+        , source_lane::varchar              as source_lane
+        , operating_unit::varchar           as site
+        , null::varchar                     as site_name
+        , snapshot_date::date               as snapshot_date
+        , 'SNAPSHOT_DATE'::varchar          as snapshot_source
+        , date_trunc('month', period_date)::date as stay_period_start
+        , period_date::date                 as stay_period_end
+        , 'MONTH'::varchar                  as stay_grain
+        , department_code::varchar          as segment
+        , 'DEPARTMENT_CODE'::varchar        as segment_source
+        , null::varchar                     as booking_status
+        , as_of::varchar                    as vantage
+        , metric::varchar                   as metric_name
+        , (case when metric like '%RMS%' then 'ROOMS' when metric like '%REV%' then 'CURRENCY' end)::varchar as metric_unit
+        , ((case when metric like '%RMS%' then 'ROOMS' when metric like '%REV%' then 'CURRENCY' end) in ('ROOMS', 'CURRENCY'))::boolean as is_additive
+        , amount::float                     as value
+        , iff((case when metric like '%RMS%' then 'ROOMS' when metric like '%REV%' then 'CURRENCY' end) = 'CURRENCY', 'USD', null)::varchar as currency_code
+        , (snapshot_date = max(snapshot_date) over (partition by operating_unit, source_table))::boolean as is_latest_snapshot
+        , source_table::varchar             as source_table
+        , (source_file_path || '|' || source_row_number || '|' || period_date)::varchar as source_line_key
+        , object_delete(object_construct_keep_null(*), 'RUN_ID', 'METRIC', 'AMOUNT')::object as attributes
+    from DEV_G2M_AI.TRANSFORMATION.XFRM_WESTIN_HILTON_HEAD_PACING
+    where 1=1
+    -- END LANE WESTIN_HILTON_HEAD
     union all
     
 -- BEGIN LANE KSL_SELECT_SERVICE
