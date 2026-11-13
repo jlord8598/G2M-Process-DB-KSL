@@ -2489,6 +2489,143 @@ begin
             , :P_RUN_ID, :P_RUN_ID
         );
 
+    elseif (:P_LANE = 'THE_PIG') then
+        -- ====================================================================
+        -- LANE THE_PIG (build 21; pacing-only before, D-44)
+        -- Facts: PL_MONTHLY (CLN_PIG_HOTELS_FIN_PL_MONTHLY). Pacing never feeds
+        -- the seeder (D-37). By line code (owner, build 21 M1, Q-03, Q-10):
+        --   STATISTIC (C00001 / C00008 / C00010-050) -> Statistic, H2 = the line
+        --     code (D-38), METRIC_UNIT null, UNRATIFIED; Occupancy % not additive.
+        --   P2xxxx, C00200-050, C00200-400 -> Revenue / Revenue.
+        --   P3xxxx -> Expense / Cost of Goods Sold.
+        --   P4xxxx, P5xxxx, C00330-052 -> Expense / Payroll.
+        --   P6xxxx, C00850-650 / -700 -> Expense / Operating Expenses.
+        --   C00635-900 Rent, C00640-900 Property and Other Taxes, C00645-900
+        --     Insurance -> Below the Line / Other Income / (Expense): non-operating,
+        --     below GOP, above EBITDA (USALI), as BEAUMIER, DAVIDSON, NEWBURY.
+        --   Anything else Unclassified.
+        -- ====================================================================
+        merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
+        using (
+            with
+            -- ----------------------------------------------------------------
+            -- fact staging rows
+            -- ----------------------------------------------------------------
+            fact as (
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                from DEV_G2M_AI.STAGING.STG_THE_PIG_PL_MONTHLY
+            )
+            -- ----------------------------------------------------------------
+            -- extract: one row per five-part key, attributes by MIN()
+            -- ----------------------------------------------------------------
+            , ext as (
+                select
+                      coalesce(nullif(trim(source_lane), ''), '~BLANK~')      as k_lane
+                    , coalesce(nullif(trim(source_site_code), ''), '~BLANK~') as k_site
+                    , coalesce(nullif(trim(department), ''), '~BLANK~')       as k_dept
+                    , coalesce(nullif(trim(account_key), ''), '~BLANK~')      as k_acct
+                    , coalesce(nullif(trim(record_type), ''), '~BLANK~')      as k_rtype
+                    , min(asset_name)                                         as asset_name
+                    , min(department_name)                                    as department_name
+                    , min(account_number)                                     as account_number
+                    , min(stat_account)                                       as stat_account
+                    , min(account_desc)                                       as account_desc
+                from fact
+                where 1=1
+                group by 1, 2, 3, 4, 5
+            )
+            -- ----------------------------------------------------------------
+            -- propose H1 / H2
+            -- ----------------------------------------------------------------
+            , cls as (
+                select
+                      ext.*
+                    , case
+                          when k_rtype = 'STATISTIC'                                   then 'Statistic'
+                          when k_acct in ('C00200-050', 'C00200-400')                  then 'Revenue'
+                          when left(k_acct, 2) = 'P2'                                  then 'Revenue'
+                          when left(k_acct, 2) in ('P3', 'P4', 'P5', 'P6')             then 'Expense'
+                          when k_acct in ('C00330-052', 'C00850-650', 'C00850-700')    then 'Expense'
+                          when k_acct in ('C00635-900', 'C00640-900', 'C00645-900')    then 'Below the Line'
+                          else 'Unclassified'
+                      end as h1
+                    , case
+                          when k_rtype = 'STATISTIC'                                   then k_acct
+                          when k_acct in ('C00200-050', 'C00200-400')                  then 'Revenue'
+                          when left(k_acct, 2) = 'P2'                                  then 'Revenue'
+                          when left(k_acct, 2) = 'P3'                                  then 'Cost of Goods Sold'
+                          when left(k_acct, 2) in ('P4', 'P5')                         then 'Payroll'
+                          when k_acct = 'C00330-052'                                   then 'Payroll'
+                          when left(k_acct, 2) = 'P6'                                  then 'Operating Expenses'
+                          when k_acct in ('C00850-650', 'C00850-700')                  then 'Operating Expenses'
+                          when k_acct in ('C00635-900', 'C00640-900', 'C00645-900')    then 'Other Income / (Expense)'
+                          else 'UNCLASSIFIED'
+                      end as h2
+                    , case
+                          when k_rtype = 'STATISTIC'
+                              then 'RECORD_TYPE STATISTIC; H2 = ' || k_acct || ', the line code (D-38, build 21 Q-10)'
+                          when k_acct in ('C00635-900', 'C00640-900', 'C00645-900')
+                              then k_acct || ': non-operating, below GOP above EBITDA (owner, build 21 Q-03)'
+                          when left(k_acct, 1) = 'P' or left(k_acct, 1) = 'C'
+                              then 'line code ' || k_acct || ' by prefix (owner, build 21 M1)'
+                          else 'line code ' || k_acct || ': nothing to derive'
+                      end as seed_source
+                from ext
+            )
+            select
+                  k_lane, k_site, k_dept, k_acct, k_rtype
+                , asset_name, department_name, account_number, stat_account, account_desc
+                , h1, h2
+                , 'UNCLASSIFIED' as h3
+                , 'UNCLASSIFIED' as h4
+                , 'UNCLASSIFIED' as h5
+                , case h2
+                      when 'Revenue'                  then 'Gross Profit'
+                      when 'Cost of Goods Sold'       then 'Gross Profit'
+                      when 'Payroll'                  then 'Operating'
+                      when 'Operating Expenses'       then 'Operating'
+                      when 'Other Income / (Expense)' then 'Non-Operating'
+                  end as p_l_section
+                , case h2
+                      when 'Revenue'                  then 'Credit'
+                      when 'Cost of Goods Sold'       then 'Debit'
+                      when 'Payroll'                  then 'Debit'
+                      when 'Operating Expenses'       then 'Debit'
+                      when 'Other Income / (Expense)' then 'Mixed'
+                  end as normal_balance
+                , case h2
+                      when 'Revenue'                  then 1
+                      when 'Cost of Goods Sold'       then -1
+                      when 'Payroll'                  then -1
+                      when 'Operating Expenses'       then -1
+                  end::number(2,0) as value_sign
+                , null::varchar as metric_unit
+                , case when h1 = 'Statistic' then 'UNRATIFIED' end as aggregation_type
+                , seed_source
+            from cls
+        ) src
+            on  tgt.source_lane      = src.k_lane
+            and tgt.source_site_code = src.k_site
+            and tgt.department       = src.k_dept
+            and tgt.account_key      = src.k_acct
+            and tgt.record_type      = src.k_rtype
+        when matched then update set
+              tgt.last_seen_run_id = :P_RUN_ID
+        when not matched then insert (
+              source_lane, source_site_code, department, account_key, record_type
+            , asset_name, department_name, account_number, stat_account, account_desc
+            , h1, h2, h3, h4, h5, p_l_section, normal_balance, value_sign
+            , metric_unit, aggregation_type, review_status, seed_source
+            , first_seen_run_id, last_seen_run_id
+        ) values (
+              src.k_lane, src.k_site, src.k_dept, src.k_acct, src.k_rtype
+            , src.asset_name, src.department_name, src.account_number, src.stat_account, src.account_desc
+            , src.h1, src.h2, src.h3, src.h4, src.h5, src.p_l_section, src.normal_balance, src.value_sign
+            , src.metric_unit, src.aggregation_type, 'UNREVIEWED', src.seed_source
+            , :P_RUN_ID, :P_RUN_ID
+        );
+
     else
         raise e_lane;
     end if;

@@ -24,7 +24,31 @@ begin
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 
-    call DEV_G2M_AI.STAGING.SPROC_STG_DAVIDSON_ACCOUNT_LOOKUP(:v_run_id) into :v_r;
+    call DEV_G2M_AI.STAGING.SPROC_STG_DAVIDSON_ACCOUNT_MAPPING(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_DAVIDSON_DEPARTMENTS(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_DAVIDSON_CHART_OF_ACCOUNTS(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_DAVIDSON_REVENUE_CATEGORIES(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_DAVIDSON_SALES_ITEMS(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_DAVIDSON_SPEND_CATEGORIES(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_DAVIDSON_LABOR_TYPES(:v_run_id) into :v_r;
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 

@@ -20,6 +20,14 @@ begin
     -- ------------------------------------------------------------------------
     -- model calls: dictionaries, facts, pacing
     -- ------------------------------------------------------------------------
+    call DEV_G2M_AI.STAGING.SPROC_STG_THE_PIG_ACCOUNTS(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_THE_PIG_PL_MONTHLY(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
     call DEV_G2M_AI.STAGING.SPROC_STG_THE_PIG_PACE_THIS_YEAR(:v_run_id) into :v_r;
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;

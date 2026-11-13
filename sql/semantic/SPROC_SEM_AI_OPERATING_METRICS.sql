@@ -14,8 +14,8 @@ $$
 -- CURRENCY_CODE (build 12, owner Q-06 / Q-10): a per-lane literal after
 -- SOURCE_AMOUNT; BEAUMIER per hotel from XFRM_BEAUMIER_* (build 15 Q-06, N-19
 -- closed), ALTERRA UNCONFIRMED (N-18).
--- Build 14: UNDER_CANVAS block added (USD, owner Q-03). THE_PIG and OUTRIGGER
--- are pacing-only lanes: no semantic block (D-24, owner Q-06).
+-- Build 14: UNDER_CANVAS block added (USD, owner Q-03). OUTRIGGER
+-- is a pacing-only lane (build 21: THE_PIG gains a block, GBP, owner Q-06); THE_PIG was: no semantic block (D-24, owner Q-06).
 -- ============================================================================
 declare
     v_rows integer;
@@ -476,6 +476,44 @@ begin
     from DEV_G2M_AI.TRANSFORMATION.XFRM_UNDER_CANVAS_OPERATING_METRICS
     where 1=1
     -- END LANE UNDER_CANVAS
+    union all
+    -- BEGIN LANE THE_PIG
+    select
+          :P_RUN_ID::varchar          as run_id
+        , source_lane::varchar        as source_lane
+        , source_site_code::varchar   as source_site_code
+        , asset_name::varchar         as asset_name
+        , department::varchar         as department
+        , department_name::varchar    as department_name
+        , account_number::varchar     as account_number
+        , stat_account::varchar       as stat_account
+        , account_key::varchar        as account_key
+        , record_type::varchar        as record_type
+        , record_type_source::varchar as record_type_source
+        , stat_unit_family::varchar   as stat_unit_family
+        , account_desc::varchar       as account_desc
+        , period_end::date            as period_end
+        , category::varchar           as category
+        , scenario::varchar           as scenario
+        , h1::varchar                 as h1
+        , h2::varchar                 as h2
+        , h3::varchar                 as h3
+        , h4::varchar                 as h4
+        , h5::varchar                 as h5
+        , p_l_section::varchar        as p_l_section
+        , normal_balance::varchar     as normal_balance
+        , is_subtotal::boolean        as is_subtotal
+        , subtotal_source::varchar    as subtotal_source
+        , source_amount::float        as source_amount
+        , 'GBP'::varchar              as currency_code
+        , stat_value::float           as stat_value
+        , source_line_key::varchar    as source_line_key
+        , source_table::varchar       as source_table
+        , metric_unit::varchar        as metric_unit
+        , aggregation_type::varchar   as aggregation_type
+    from DEV_G2M_AI.TRANSFORMATION.XFRM_THE_PIG_OPERATING_METRICS
+    where 1=1
+    -- END LANE THE_PIG
     ;
 
     v_rows := (select count(*) from DEV_G2M_AI.SEMANTIC.SEM_AI_OPERATING_METRICS);

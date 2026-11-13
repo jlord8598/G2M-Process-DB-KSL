@@ -1,0 +1,15 @@
+# Sources - this build (21: THE_PIG P&L, DAVIDSON segment fill)
+
+Source CLN.BOX_INVESTMENT_DATA. Lanes THE_PIG, DAVIDSON (D-44). Freeze: to confirm (Q-01).
+
+| Table | Rows | Loaded | Use |
+|---|---|---|---|
+| CLN_PIG_HOTELS_FIN_PL_MONTHLY | 12,528 | 11-13 06:48 | new fact |
+| CLN_PIG_HOTELS_REF_ACCOUNTS | 1,044 | 11-13 06:48 | new dictionary |
+| CLN_PIG_HOTELS_PACE_OTB_MONTHLY | 5,184 | 11-13 06:48 | pacing (content unchanged) |
+| CLN_DAVIDSON_REF_ACCOUNT_MAPPING | 5,504 | 11-13 08:10 | replaces REF_ACCOUNT_LOOKUP (identical) |
+| CLN_DAVIDSON_REF_DEPARTMENTS / CHART_OF_ACCOUNTS / REVENUE_CATEGORIES / SALES_ITEMS / SPEND_CATEGORIES / LABOR_TYPES | 66 / 220 / 83 / 341 / 323 / 293 | 11-13 08:10 | new segment dictionaries |
+| CLN_DAVIDSON_FIN_PL_MONTHLY / FIN_BUDGET_MONTHLY / FIN_PL_SUMMARY / REF_ACCOUNTS | 157,020 / 245,676 / 238,944 / 44,839 | 11-13 08:10 | facts, dictionary |
+| CLN_DAVIDSON_FIN_BUDGET_SUMMARY | 239,616 | 11-13 08:10 | new, unstaged (Q-02) |
+| CLN_DAVIDSON_PACE_GROUP_ANNUAL | 2,856 | 11-13 08:10 | not staged (N-51) |
+| CLN_DAVIDSON_REF_ACCOUNT_LOOKUP | 5,504 | 11-12 11:07 | retired by MAPPING (Q-09) |

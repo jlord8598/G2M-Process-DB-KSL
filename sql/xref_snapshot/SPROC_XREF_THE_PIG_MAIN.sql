@@ -10,14 +10,21 @@ $$
 -- itself. Stamps its own RUN_ID and recreates the three review views
 -- (identical text in every XREF MAIN).
 -- Calls no other MAIN. Catches no exception.
--- Build 14 (new lane), pacing-only: no fact table, so no seeder call (owner,
--- stop 3; D-37). Recreates the three review views only.
+-- Build 14 (new lane), pacing-only: no seeder call (owner, stop 3; D-37).
+-- Build 21: the P&L fact (STG_THE_PIG_PL_MONTHLY) arrives, so the seeder is
+-- called for THE_PIG before the review views (pacing still never feeds it).
 -- ============================================================================
 declare
     v_run_id varchar default 'RUN_' || to_char(current_timestamp(), 'YYYYMMDD_HH24MISS_FF3');
     v_models integer default 0;
     v_r      varchar default '';
 begin
+    -- ------------------------------------------------------------------------
+    -- model calls
+    -- ------------------------------------------------------------------------
+    call DEV_G2M_AI.XREF_SNAPSHOT.SPROC_XREF_ACCOUNT_CLASSIFICATION(:v_run_id, 'THE_PIG') into :v_r;
+    v_models := v_models + 1;
+
     -- ------------------------------------------------------------------------
     -- review views
     -- ------------------------------------------------------------------------
