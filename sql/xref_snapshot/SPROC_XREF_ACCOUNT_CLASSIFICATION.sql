@@ -1622,6 +1622,15 @@ begin
         --   Non-Operating sections Other Income / (Expense). Department
         --   sections Unclassified.
         -- H2 values are from the standard hierarchy only; none is invented.
+        -- Build 24 (D-44 rebuild, owner Q-01, Q-02, Q-08):
+        --   one-segment ACCOUNT strings take their natural account from segment 2
+        --   of their REF_ACCOUNTS alias (staged ALIAS_NATURAL_ACCOUNT), unless the
+        --   alias is a 9xxx statistic ledger (left Unclassified; RECORD_TYPE is a
+        --   key part and is not changed). 5990 Allocations -> Expense / Operating
+        --   Expenses (inside GOP). 6000 Income - Non Operating, 7000 Management Fee,
+        --   7100-7400 Non-Operating Rent / Insurance / Taxes / Other and 7600
+        --   Interest, Depreciation and Amortization -> Below the Line / Other
+        --   Income / (Expense). Other 6xxx / 7xxx unchanged.
         -- ====================================================================
         merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
         using (
@@ -1632,18 +1641,18 @@ begin
             fact as (
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , source_table, natural_account
+                     , source_table, natural_account, alias_natural_account
                 from DEV_G2M_AI.STAGING.STG_DAVIDSON_HOTEL_MONTHLY_REPORT
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
-                     , source_table, null::varchar as natural_account
+                     , source_table, null::varchar as natural_account, null::varchar as alias_natural_account
                 from DEV_G2M_AI.STAGING.STG_DAVIDSON_FULL_YEAR_PL
                 union all
                 select source_lane, source_site_code, department, account_key, record_type
                      , asset_name, department_name, account_number, stat_account, account_desc
                      , 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY'::varchar as source_table
-                     , natural_account
+                     , natural_account, alias_natural_account
                 from DEV_G2M_AI.STAGING.STG_DAVIDSON_HOTEL_BUDGET
             )
             -- ----------------------------------------------------------------
@@ -1662,7 +1671,8 @@ begin
                     , min(stat_account)                                       as stat_account
                     , min(account_desc)                                       as account_desc
                     , min(source_table)                                       as src_tbl
-                    , min(natural_account)                                    as nat
+                    , min(natural_account)                                    as nat_stated
+                    , min(alias_natural_account)                              as nat_alias
                 from fact
                 where 1=1
                 group by 1, 2, 3, 4, 5
@@ -1670,7 +1680,9 @@ begin
             , prop as (
                 select
                       ext.*
-                    , try_to_number(ext.nat) as n
+                    , coalesce(ext.nat_stated, iff(left(ext.nat_alias, 1) = '9', null, ext.nat_alias)) as nat
+                    , try_to_number(coalesce(ext.nat_stated, iff(left(ext.nat_alias, 1) = '9', null, ext.nat_alias))) as n
+                    , iff(ext.nat_stated is null and ext.nat_alias is not null and left(ext.nat_alias, 1) <> '9', 'ALIAS', 'STATED') as nat_source
                 from ext
             )
             -- ----------------------------------------------------------------
@@ -1688,7 +1700,9 @@ begin
                                   when n in (5100, 5110)             then 'Expense'
                                   when n between 5200 and 5204       then 'Expense'
                                   when n = 5900                      then 'Expense'
-                                  when n = 5990                      then 'Allocations & Reserves'
+                                  when n = 5990                      then 'Expense'
+                                  when n = 6000                      then 'Below the Line'
+                                  when n in (7000, 7100, 7200, 7300, 7400, 7600) then 'Below the Line'
                                   when n between 6000 and 7999       then 'Expense'
                                   when n between 8000 and 8999       then 'Below the Line'
                                   else 'Unclassified'
@@ -1711,6 +1725,9 @@ begin
                                   when n in (5100, 5110)             then 'Cost of Goods Sold'
                                   when n between 5200 and 5204       then 'Operating Expenses'
                                   when n = 5900                      then 'Operating Expenses'
+                                  when n = 5990                      then 'Operating Expenses'
+                                  when n = 6000                      then 'Other Income / (Expense)'
+                                  when n in (7000, 7100, 7200, 7300, 7400, 7600) then 'Other Income / (Expense)'
                                   when n between 6000 and 6999       then 'Payroll'
                                   when n between 7000 and 7999       then 'Operating Expenses'
                                   when n between 8000 and 8999       then 'Other Income / (Expense)'
@@ -1732,9 +1749,17 @@ begin
                               then 'RECORD_TYPE STATISTIC; H2 = the natural account, the source code (owner Q-07)'
                           when k_rtype = 'STATISTIC'
                               then 'RECORD_TYPE STATISTIC; H2 = the source line identifier (LINE_CLASS or PL line text; Q-06)'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and n is null and left(nat_alias, 1) = '9'
+                              then 'one-segment ACCOUNT; its REF_ACCOUNTS alias is a 9xxx statistic ledger on an AMOUNT key: not in landed data as money, nothing derived (build 24 Q-02)'
                           when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and n is null
-                              then 'no natural account (one-segment or blank ACCOUNT): nothing to derive, not repaired'
-                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and (n between 4000 and 5006 or n in (5100, 5110) or n between 5200 and 5204 or n in (5900, 5990))
+                              then 'no natural account (one-segment or blank ACCOUNT, no usable REF_ACCOUNTS alias): not in landed data, nothing derived (build 24 Q-02)'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and n = 5990
+                              then iff(nat_source = 'ALIAS', 'REF_ACCOUNTS alias ', '') || 'natural account 5990 Allocations: inside GOP as Operating Expenses (build 24 Q-08)'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and (n = 6000 or n in (7000, 7100, 7200, 7300, 7400, 7600))
+                              then iff(nat_source = 'ALIAS', 'REF_ACCOUNTS alias ', '') || 'natural account ' || nat || ': non-operating / below-GOP ledger, Other Income / (Expense) (build 24 Q-08; no management-fee Level 1 between GOP and EBITDA in the hierarchy or a peer lane)'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and nat_source = 'ALIAS'
+                              then 'REF_ACCOUNTS alias natural account ' || nat || ' of a one-segment ACCOUNT (build 24 Q-01; lane map)'
+                          when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and (n between 4000 and 5006 or n in (5100, 5110) or n between 5200 and 5204 or n = 5900)
                               then 'natural account ' || nat || ' (owner Q-09 map, from data; source owner to confirm)'
                           when src_tbl = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_MONTHLY' and n between 6000 and 8999
                               then 'section digit ' || left(nat, 1) || ' of natural account ' || nat || ' (owner Q-09: as proposed)'

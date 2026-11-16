@@ -31,6 +31,11 @@ $$
 -- four file/row pointers (unique at M1) plus branch.
 -- Build 16: reads the new table name directly; the old-name view's select
 -- (added PROPERTY_NAME) is inlined, every new-table column carried (rule 3).
+-- Build 24 (owner Q-04, Q-05): IS_SUBTOTAL also on every all-capitals line
+--   (non-statistic); SUMMARY_LINE_KIND (ROLLUP_ROW, STATISTIC, TOTAL_REPEAT,
+--   SUBTOTAL, DETAIL) labels the line for the D-48 reason in transformation.
+--   Detail-named "| #n" lines are distinct detail (Q-05). No key, amount or
+--   row changes.
 -- ============================================================================
 declare
     v_rows integer;
@@ -66,6 +71,11 @@ begin
             , (unp.report_sheet = 'SUMMARY'
                 and regexp_like(unp.section, '^\\[.*\\]$|^[A-Z]{6} ?-.*'))      as c_is_stat
             , regexp_like(unp.line_item, '^ *total( .*)?$', 'i')                 as c_total_word
+            , (unp.line_item = upper(unp.line_item)
+                and regexp_like(unp.line_item, '.*[A-Z].*'))                     as c_all_caps
+            , (contains(unp.line_item, '| #')
+                and trim(split_part(unp.line_item, '|', 1)) = upper(trim(split_part(unp.line_item, '|', 1)))
+                and regexp_like(trim(split_part(unp.line_item, '|', 1)), '.*[A-Z].*')) as c_total_repeat
         from unp
     )
     -- ------------------------------------------------------------------------
@@ -110,7 +120,8 @@ begin
         , iff(cln.c_is_stat, cln.m_amount, null)::float                         as stat_value
         , (coalesce(cln.is_rollup, false)
             or (cln.report_sheet = 'SUMMARY' and not cln.c_is_stat)
-            or (coalesce(cln.c_total_word, false) and not cln.c_is_stat))::boolean as is_subtotal
+            or (coalesce(cln.c_total_word, false) and not cln.c_is_stat)
+            or (coalesce(cln.c_all_caps, false) and not cln.c_is_stat))::boolean as is_subtotal
         , case
               when cln.is_rollup
                   then 'IS_ROLLUP: source roll-up row (source flag; Q-08)'
@@ -121,6 +132,10 @@ begin
                   then 'SUMMARY sheet amount line: total of ALL_DEPARTMENT (verified on one line pair; Q-08)'
               when cln.c_total_word and not cln.c_is_stat
                   then 'LINE_ITEM first word Total: source total line (structure; Q-08)'
+              when cln.c_total_repeat and not cln.c_is_stat
+                  then 'all-capitals total repeated as "| #n": repeat of its first line (build 24 Q-05; 4,409 of 4,428 equal at M1)'
+              when cln.c_all_caps and not cln.c_is_stat
+                  then 'all-capitals group line: source subtotal (build 24 Q-04; tie-out 68.6% at M1, the rest computed differences)'
               else 'not a roll-up, SUMMARY line or Total line'
           end::varchar                                                          as subtotal_source
         , (coalesce(cln.hotel_code, '~BLANK~')
@@ -135,6 +150,15 @@ begin
             || '|' || coalesce(to_char(cln.forecast_source_row_number), '~BLANK~')
             || '|' || cln.measure_column)::varchar                              as source_line_key
         , cln.measure_column::varchar                                           as measure_column
+        , case
+              when coalesce(cln.is_rollup, false)                         then 'ROLLUP_ROW'
+              when cln.c_is_stat                                          then 'STATISTIC'
+              when coalesce(cln.c_total_repeat, false)                    then 'TOTAL_REPEAT'
+              when cln.report_sheet = 'SUMMARY'
+                or coalesce(cln.c_total_word, false)
+                or coalesce(cln.c_all_caps, false)                        then 'SUBTOTAL'
+              else 'DETAIL'
+          end::varchar                                                          as summary_line_kind
         -- --------------------------------------------------------------------
         -- raw source columns, verbatim
         -- --------------------------------------------------------------------

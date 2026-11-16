@@ -43,6 +43,9 @@ $$
 --   ("Other Expenses"), and the mapping is the fuller text of the same chart
 --   ("5200:Other Expenses | Lounge | Dishwashing Supplies"). This supersedes the
 --   build-20 "existing description first" order for these two tables.
+-- Build 24 (owner Q-01): ALIAS_ACCOUNT_STRING / ALIAS_NATURAL_ACCOUNT, for a
+--   one-segment ACCOUNT only: its REF_ACCOUNTS.ALIAS and that alias's segment 2,
+--   for the seeder. Key, RECORD_TYPE and amounts unchanged.
 -- ============================================================================
 declare
     v_rows integer;
@@ -102,6 +105,21 @@ begin
         where 1=1
           and a.raw_source_table = 'CLN_DAVIDSON_FIN_PL_MONTHLY'
         group by a.entity_code, a.full_account_string
+    )
+    -- ------------------------------------------------------------------------
+    -- build 24 (owner Q-01): the source's six-segment alias of a one-segment
+    -- ACCOUNT string (REF_ACCOUNTS.ALIAS; one alias per string at M1). Its
+    -- segment 2 is the ledger account the seeder reads. Structural lookup: the
+    -- key is unchanged and nothing is repaired.
+    -- ------------------------------------------------------------------------
+    , ali as (
+        select
+              a.full_account_string
+            , min(nullif(trim(a.alias), '')) as alias_string
+        from DEV_G2M_AI.STAGING.STG_DAVIDSON_ACCOUNTS a
+        where 1=1
+          and nullif(trim(a.alias), '') is not null
+        group by a.full_account_string
     )
     -- ------------------------------------------------------------------------
     -- builds 20-21 (N-49): ProfitSword account mapping, one line per account
@@ -204,6 +222,8 @@ begin
             || '|' || cln.measure_column)::varchar                              as source_line_key
         , cln.measure_column::varchar                                           as measure_column
         , cln.c_natural::varchar                                                as natural_account
+        , iff(cln.c_natural is null and regexp_count(cln.account, '-') = 0, ali.alias_string, null)::varchar as alias_account_string
+        , iff(cln.c_natural is null and regexp_count(cln.account, '-') = 0 and regexp_count(ali.alias_string, '-') = 5, nullif(split_part(ali.alias_string, '-', 2), ''), null)::varchar as alias_natural_account
         -- --------------------------------------------------------------------
         -- raw source columns, verbatim
         -- --------------------------------------------------------------------
@@ -231,6 +251,8 @@ begin
         and acct.full_account_string = coalesce(cln.account, cln.line_class)
     left join lkp
         on  lkp.cps = cln.account
+    left join ali
+        on  ali.full_account_string = cln.account
     left join seg_dict s1
         on  s1.seg = 1
         and s1.code = iff(regexp_count(cln.account, '-') = 5, nullif(split_part(cln.account, '-', 1), 'XXXXX'), null)

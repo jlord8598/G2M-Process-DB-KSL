@@ -26,6 +26,17 @@ $$
 -- Built from the lane-independent text of SPROC_XFRM_DAVIDSON (build 06).
 -- Build 19 (owner Q-11): STG_DAVIDSON_HOTEL_BUDGET added to the fact union;
 --   MEASURE_COLUMN BUDGET -> category BUDGET (2026 and 2027 budgets).
+-- Build 24 (D-44 rebuild; owner Q-03, Q-06, Q-07): D-48, FIN_PL_MONTHLY beats
+--   FIN_PL_SUMMARY for every DAVIDSON hotel-month, so every summary money line
+--   leaves the income statement for UNKNOWN:
+--     classified (routed H1): DUPLICATE_DETAIL, keeping H1-H5 and CATEGORY
+--       (check 2(e)); its IS_SUBTOTAL / SUBTOTAL_SOURCE still say total;
+--     unclassified total, profit / EBITDA, all-capitals group, total "| #n"
+--       repeat or group roll-up row (SUMMARY_LINE_KIND ROLLUP_ROW, SUBTOTAL,
+--       TOTAL_REPEAT): SOURCE_ROLLUP;
+--     unclassified detail: DUPLICATE_DETAIL.
+--   The summary's STATISTIC lines (hotel-heading sections) stay in operating
+--   metrics; they are not P&L lines.
 -- ============================================================================
 declare
     v_is  integer;
@@ -66,18 +77,21 @@ begin
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , null::varchar as summary_line_kind
         from DEV_G2M_AI.STAGING.STG_DAVIDSON_HOTEL_MONTHLY_REPORT
         union all
         select source_lane, source_site_code, asset_name, department, department_name
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , summary_line_kind
         from DEV_G2M_AI.STAGING.STG_DAVIDSON_FULL_YEAR_PL
         union all
         select source_lane, source_site_code, asset_name, department, department_name
              , account_number, stat_account, account_key, record_type, record_type_source
              , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
              , is_subtotal, subtotal_source, source_line_key, source_table, measure_column
+             , null::varchar as summary_line_kind
         from DEV_G2M_AI.STAGING.STG_DAVIDSON_HOTEL_BUDGET
     )
     -- ------------------------------------------------------------------------
@@ -133,6 +147,12 @@ begin
         , cls.metric_unit::varchar                             as metric_unit
         , cls.aggregation_type::varchar                        as aggregation_type
         , case
+              when cat.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY' and coalesce(cat.summary_line_kind, '') <> 'STATISTIC' and cls.h1 in ('Revenue', 'Expense', 'Below the Line', 'Allocations & Reserves', 'Balance Sheet')
+                  then 'DUPLICATE_DETAIL'
+              when cat.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY' and cat.summary_line_kind in ('ROLLUP_ROW', 'SUBTOTAL', 'TOTAL_REPEAT') and cls.h1 = 'Unclassified' and cat.category is not null
+                  then 'SOURCE_ROLLUP'
+              when cat.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_DAVIDSON_FIN_PL_SUMMARY' and cat.summary_line_kind = 'DETAIL' and cls.h1 = 'Unclassified' and cat.category is not null
+                  then 'DUPLICATE_DETAIL'
               when cls.h1 = 'Unclassified' and cat.category is null then 'BOTH'
               when cls.h1 = 'Unclassified'                          then 'UNCLASSIFIED_ACCOUNT'
               when cat.category is null                             then 'UNRESOLVED_CATEGORY'
