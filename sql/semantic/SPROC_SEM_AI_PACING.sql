@@ -1435,6 +1435,88 @@ begin
            or source_table not in ('CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_PACE_CANCELLATIONS_MONTHLY', 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_PACE_OTB_MONTHLY', 'CLN.BOX_INVESTMENT_DATA.CLN_UNDER_CANVAS_PACE_OTB_WEEKLY')
            or value is not null)
     -- END LANE UNDER_CANVAS
+    union all
+    -- BEGIN LANE HICV
+    -- Build 23 (owner Q-08). Three weekly report tables, one stream. Metric
+    -- columns: ACTUAL_AMOUNT and BUDGET_AMOUNT (KPI, TREND: k = 2); RESERVATIONS
+    -- populates ACTUAL_AMOUNT only (k = 1; its BUDGET_AMOUNT is emitted only
+    -- where it holds a value, which is never). SNAPSHOT_DATE is the as-of;
+    -- VANTAGE = ACTUAL_SOURCE (CY / PY) for ACTUAL_AMOUNT, BUDGET for
+    -- BUDGET_AMOUNT. SEGMENT = SECTION. The reports are portfolio-level: SITE
+    -- null. PERIOD_WINDOW (WEEK / MTD / YTD) is not a D-51 STAY_GRAIN, so
+    -- STAY_GRAIN and STAY_PERIOD_START are null and the window is carried in
+    -- ATTRIBUTES; STAY_PERIOD_END = PERIOD_DATE. METRIC_UNIT from the unit the
+    -- section or line states ($, $'000, $000's, %, rate, per). On the Sales tab
+    -- the unit is stated once, on the header line of each block, and filled down
+    -- to the block (owner Q-23; XFRM BLOCK_HEADER): Close Rate PERCENT, ASP ($'s)
+    -- and VPG ($'s) CURRENCY_PER_UNIT, Gross Volume ($000's) CURRENCY_THOUSANDS.
+    -- The block headed "Sales" and the lines above the first header state no
+    -- unit: null and not additive. Rates, percentages and per-unit values are not additive; values
+    -- are carried as stated, never scaled ($'000 stays in thousands).
+    select
+          :P_RUN_ID::varchar                as run_id
+        , source_lane::varchar              as source_lane
+        , site::varchar                     as site
+        , null::varchar                     as site_name
+        , as_of_date::date                  as snapshot_date
+        , 'SNAPSHOT_DATE'::varchar          as snapshot_source
+        , null::date                        as stay_period_start
+        , period_date::date                 as stay_period_end
+        , null::varchar                     as stay_grain
+        , section::varchar                  as segment
+        , 'SECTION'::varchar                as segment_source
+        , null::varchar                     as booking_status
+        , iff(metric_name = 'ACTUAL_AMOUNT', actual_source, 'BUDGET')::varchar as vantage
+        , metric_name::varchar              as metric_name
+        , (case
+            when report_tab = 'Sales' and block_header is null then null
+            when contains(unit_text, '%') or lower(unit_text) like '%rate%' then 'PERCENT'
+            when lower(unit_text) like '% per %' or unit_text like 'ASP%' or unit_text like 'VPG%' then 'CURRENCY_PER_UNIT'
+            when unit_text like '%$''000%' or unit_text like '%$000''s%' then 'CURRENCY_THOUSANDS'
+            when unit_text like '%$%' or report_tab = 'Room Revenue' then 'CURRENCY'
+            when report_tab = 'Sales' then null
+            else 'COUNT'
+          end)::varchar as metric_unit
+        , (coalesce((case
+            when report_tab = 'Sales' and block_header is null then null
+            when contains(unit_text, '%') or lower(unit_text) like '%rate%' then 'PERCENT'
+            when lower(unit_text) like '% per %' or unit_text like 'ASP%' or unit_text like 'VPG%' then 'CURRENCY_PER_UNIT'
+            when unit_text like '%$''000%' or unit_text like '%$000''s%' then 'CURRENCY_THOUSANDS'
+            when unit_text like '%$%' or report_tab = 'Room Revenue' then 'CURRENCY'
+            when report_tab = 'Sales' then null
+            else 'COUNT'
+          end), '~') in ('COUNT', 'CURRENCY', 'CURRENCY_THOUSANDS'))::boolean as is_additive
+        , value::float                      as value
+        , iff((case
+            when report_tab = 'Sales' and block_header is null then null
+            when contains(unit_text, '%') or lower(unit_text) like '%rate%' then 'PERCENT'
+            when lower(unit_text) like '% per %' or unit_text like 'ASP%' or unit_text like 'VPG%' then 'CURRENCY_PER_UNIT'
+            when unit_text like '%$''000%' or unit_text like '%$000''s%' then 'CURRENCY_THOUSANDS'
+            when unit_text like '%$%' or report_tab = 'Room Revenue' then 'CURRENCY'
+            when report_tab = 'Sales' then null
+            else 'COUNT'
+          end) in ('CURRENCY', 'CURRENCY_THOUSANDS', 'CURRENCY_PER_UNIT'), 'USD', null)::varchar as currency_code
+        , (as_of_date = max(as_of_date) over (partition by site, source_table))::boolean as is_latest_snapshot
+        , source_table::varchar             as source_table
+        , source_line_key::varchar          as source_line_key
+        , attributes::object                as attributes
+    from (
+        select
+              source_lane, source_table, site, as_of_date, period_date, section, report_tab, line_item, actual_source, source_line_key, block_header
+            , iff(report_tab = 'Sales', block_header, section || ' ' || line_item) as unit_text
+            , object_delete(object_construct_keep_null(*), 'RUN_ID', 'ACTUAL_AMOUNT', 'BUDGET_AMOUNT') as attributes
+            , actual_amount::float as ACTUAL_AMOUNT
+            , budget_amount::float as BUDGET_AMOUNT
+        from DEV_G2M_AI.TRANSFORMATION.XFRM_HICV_PACING
+        where 1=1
+    ) unpivot include nulls (value for metric_name in (ACTUAL_AMOUNT, BUDGET_AMOUNT))
+    where 1=1
+      -- keep every cell of a declared (table, column); an undeclared cell only
+      -- when it holds a value, so no stored value is ever dropped (D-51)
+      and (source_table in ('CLN.BOX_INVESTMENT_DATA.CLN_HICV_OPS_KPI_WEEKLY', 'CLN.BOX_INVESTMENT_DATA.CLN_HICV_OPS_TREND_WEEKLY')
+           or (source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_HICV_PACE_RESERVATIONS_WEEKLY' and metric_name = 'ACTUAL_AMOUNT')
+           or value is not null)
+    -- END LANE HICV
     ;
 
     v_rows := (select count(*) from DEV_G2M_AI.SEMANTIC.SEM_AI_PACING);

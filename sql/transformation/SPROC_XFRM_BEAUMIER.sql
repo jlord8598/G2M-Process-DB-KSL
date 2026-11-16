@@ -34,6 +34,11 @@ $$
 --   lacks; losers to UNKNOWN as DUPLICATE_DETAIL, keeping H1-H5.
 -- Build 16: source-table literals use the new CLN.BOX_INVESTMENT_DATA names
 -- (CLN_UTIL_TABLE_MAP); same tables, same rows, logic unchanged.
+-- Build 23 (D-44 rebuild, 2027 budget add-on): STG_BEAUMIER_BUDGET_USALI and
+--   STG_BEAUMIER_OPS_STATS added to the fact rows, category BUDGET from the
+--   source table (owner Q-14, Q-17); USALI PROFIT (Q-16); OPS_STATS rows are
+--   STATISTIC and route to operating metrics. No overlap with the 2025-26
+--   budget, so no D-48 rule (M1). Existing rows and the BP rule unchanged.
 -- ============================================================================
 declare
     v_is  integer;
@@ -83,6 +88,22 @@ begin
              , is_subtotal, subtotal_source, source_line_key, source_table, null::varchar as measure_column
              , source_sign_convention, source_sign_convention_source, currency_code, file_date
         from DEV_G2M_AI.STAGING.STG_BEAUMIER_BUDGET
+        union all
+        -- build 23 (D-44): the 2027 USALI budget
+        select source_lane, source_site_code, asset_name, department, department_name
+             , account_number, stat_account, account_key, record_type, record_type_source
+             , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
+             , is_subtotal, subtotal_source, source_line_key, source_table, source_measure as measure_column
+             , source_sign_convention, source_sign_convention_source, currency_code, file_date
+        from DEV_G2M_AI.STAGING.STG_BEAUMIER_BUDGET_USALI
+        union all
+        -- build 23 (D-44): the 2027 operating statistics (owner Q-14)
+        select source_lane, source_site_code, asset_name, department, department_name
+             , account_number, stat_account, account_key, record_type, record_type_source
+             , stat_unit_family, account_desc, period_end, scenario, source_amount, stat_value
+             , is_subtotal, subtotal_source, source_line_key, source_table, source_measure as measure_column
+             , source_sign_convention, source_sign_convention_source, currency_code, file_date
+        from DEV_G2M_AI.STAGING.STG_BEAUMIER_OPS_STATS
     )
     -- ------------------------------------------------------------------------
     -- category, row by row
@@ -99,6 +120,10 @@ begin
                       then 'BUDGET'
                   when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_BUDGET_MONTHLY' and fact.scenario = 'Prior Year'
                       then 'ACTUAL'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_BUDGET_MONTHLY_USALI'
+                      then 'BUDGET'
+                  when fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_OPS_STATS_MONTHLY'
+                      then 'BUDGET'
               end as category
             , coalesce(fact.scenario, '~BLANK~') as category_input
             , (fact.source_table = 'CLN.BOX_INVESTMENT_DATA.CLN_BEAUMIER_FIN_FORECAST_VERSIONS'

@@ -12,6 +12,9 @@ $$
 -- Dictionaries first: BP and BUDGET read STG_BEAUMIER_LOCATION_MAP (build 07).
 -- Build 15: SPROC_STG_BEAUMIER_HIERARCHY added (owner, stop 1); CANCELLATIONS
 -- staged before the facts, which read its CURRENCY (Q-06).
+-- Build 23 (D-44 rebuild, 2027 budget add-on): SPROC_STG_BEAUMIER_BUDGET_USALI
+-- (reads LOCATION_MAP and CANCELLATIONS) and SPROC_STG_BEAUMIER_OPS_STATS
+-- (reads LOCATION_MAP) added after the existing facts.
 -- ============================================================================
 declare
     v_run_id varchar default 'RUN_' || to_char(current_timestamp(), 'YYYYMMDD_HH24MISS_FF3');
@@ -49,6 +52,14 @@ begin
     v_models := v_models + 1;
 
     call DEV_G2M_AI.STAGING.SPROC_STG_BEAUMIER_BUDGET(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_BEAUMIER_BUDGET_USALI(:v_run_id) into :v_r;
+    v_log := v_log || '; ' || v_r;
+    v_models := v_models + 1;
+
+    call DEV_G2M_AI.STAGING.SPROC_STG_BEAUMIER_OPS_STATS(:v_run_id) into :v_r;
     v_log := v_log || '; ' || v_r;
     v_models := v_models + 1;
 
