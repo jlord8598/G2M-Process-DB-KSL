@@ -31,6 +31,15 @@ $$
 -- No filter, no aggregation. The scratch table is dropped before return.
 -- UNKNOWN_REASON SOURCE_ROLLUP (build 13, owner Q-02, Q-07): an Unclassified
 -- key on a source subtotal row (IS_SUBTOTAL, staging). Otherwise as before.
+-- Build 25 (D-44 rebuild; owner Q-01 to Q-07): D-48 precedence among the
+--   three ProfitSword actual tables, by site and month: MONTHLY_EXTENDED
+--   ACTUAL beats DAILY_EXTENDED and LEDGER_BATCHES; DAILY_EXTENDED beats
+--   LEDGER_BATCHES where monthly is absent. Every section. Losing rows go to
+--   UNKNOWN as DUPLICATE_DETAIL (classified rows keep H1-H5 and CATEGORY;
+--   unclassified losers too, except source subtotals, SOURCE_ROLLUP).
+--   D-50: LEDGER_BATCHES DEBIT (VALUE = -SOURCE_AMOUNT), the rest PRESENTED,
+--   carried in SOURCE_SIGN_CONVENTION. The lane's staging states no convention
+--   (owner Q-01: transformation-only), so it is set here by SOURCE_TABLE.
 -- ============================================================================
 declare
     v_is  integer;
@@ -139,6 +148,54 @@ begin
         where 1=1
     )
     -- ------------------------------------------------------------------------
+    -- D-48 (build 25, owner Q-02, Q-03, Q-07): site-months each source carries,
+    -- by site and month alone. MONTHLY_EXTENDED ACTUAL beats DAILY_EXTENDED and
+    -- LEDGER_BATCHES; DAILY_EXTENDED beats LEDGER_BATCHES where monthly is absent.
+    -- Every section, calculated lines included.
+    -- ------------------------------------------------------------------------
+    , mth as (
+        select
+              cat.*
+            , coalesce(nullif(trim(cat.source_site_code), ''), '~BLANK~') as c_site
+            , date_trunc('month', cat.period_end)                        as c_month
+        from cat
+        where 1=1
+    )
+    , sm_monthly as (
+        select distinct c_site, c_month
+        from mth
+        where 1=1
+          and source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_MONTHLY_EXTENDED'
+          and category = 'ACTUAL'
+    )
+    , sm_daily as (
+        select distinct c_site, c_month
+        from mth
+        where 1=1
+          and source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_DAILY_EXTENDED'
+    )
+    , prec as (
+        select
+              mth.*
+            , case
+                  when mth.source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_DAILY_EXTENDED' and sm.c_site is not null
+                      then 'MONTHLY_EXTENDED ACTUAL carries this site-month'
+                  when mth.source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_LEDGER_BATCHES' and sm.c_site is not null
+                      then 'MONTHLY_EXTENDED ACTUAL carries this site-month'
+                  when mth.source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_LEDGER_BATCHES' and sd.c_site is not null
+                      then 'DAILY_EXTENDED carries this site-month (no monthly ACTUAL)'
+              end as d48_loses_to
+            , iff(mth.source_table = 'CLN.CLEAN.CUR_PROFITSWORD_PEREGRINE_LEDGER_BATCHES', 'DEBIT', 'PRESENTED') as source_sign_convention
+        from mth
+        left join sm_monthly sm
+            on  sm.c_site  = mth.c_site
+            and sm.c_month = mth.c_month
+        left join sm_daily sd
+            on  sd.c_site  = mth.c_site
+            and sd.c_month = mth.c_month
+        where 1=1
+    )
+    -- ------------------------------------------------------------------------
     -- the one join to the classification
     -- ------------------------------------------------------------------------
     select
@@ -172,11 +229,14 @@ begin
         , cat.source_line_key::varchar                         as source_line_key
         , cat.source_table::varchar                            as source_table
         , cls.value_sign::number(2,0)                          as value_sign
-        , (cat.source_amount * cls.value_sign)::float          as value
+        , cat.source_sign_convention::varchar                  as source_sign_convention
+        , iff(cls.value_sign is null, null, iff(cat.source_sign_convention = 'DEBIT', -cat.source_amount, cat.source_amount * cls.value_sign))::float as value
         , cls.metric_unit::varchar                             as metric_unit
         , cls.aggregation_type::varchar                        as aggregation_type
         , case
+              when cat.d48_loses_to is not null and cls.h1 <> 'Unclassified' and cat.category is not null then 'DUPLICATE_DETAIL'
               when cls.h1 = 'Unclassified' and cat.category is null then 'BOTH'
+              when cat.d48_loses_to is not null and cls.h1 = 'Unclassified' and not coalesce(cat.is_subtotal, false) then 'DUPLICATE_DETAIL'
               when cls.h1 = 'Unclassified' and cat.is_subtotal      then 'SOURCE_ROLLUP'
               when cls.h1 = 'Unclassified'                          then 'UNCLASSIFIED_ACCOUNT'
               when cat.category is null                             then 'UNRESOLVED_CATEGORY'
@@ -184,7 +244,7 @@ begin
         , case
               when cat.category is null then cat.category_input
           end::varchar                                         as unresolved_category_value
-    from cat
+    from prec as cat
     left join cls
         on  cls.source_lane      = coalesce(nullif(trim(cat.source_lane), ''), '~BLANK~')
         and cls.source_site_code = coalesce(nullif(trim(cat.source_site_code), ''), '~BLANK~')
@@ -240,6 +300,7 @@ begin
         , source_amount, stat_value, source_line_key, source_table
         , value_sign, value, metric_unit, aggregation_type
         , unknown_reason, unresolved_category_value
+        , source_sign_convention
     from DEV_G2M_AI.TRANSFORMATION.TMP_XFRM_PEREGRINE_RESORTS_ROWS
     where 1=1
       and (unknown_reason is not null
