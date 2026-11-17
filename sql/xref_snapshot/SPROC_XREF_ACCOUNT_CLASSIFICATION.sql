@@ -3305,6 +3305,322 @@ begin
             , :P_RUN_ID, :P_RUN_ID
         );
 
+    elseif (:P_LANE = 'BECKONS') then
+        -- ====================================================================
+        -- LANE BECKONS (build 26, new lane; owner Q-08, Q-09)
+        -- Facts: ACTUALS, BUDGET. Key: site (LODGE_CODE, or LOCATION_NAME where
+        -- none), DEPARTMENT_TITLE, ACCOUNT_NO, RECORD_TYPE.
+        --   STATISTIC (AROOM, NIGHT, OROOM) -> Statistic, H2 = the code (D-38),
+        --     no stated unit, UNRATIFIED.
+        --   1. The key's stated iLevel mapping (ILEVELMAPPING1; constant per key,
+        --      M2): Revenue - * -> Revenue; Expenses - Cost of Sales - * -> COGS;
+        --      Expenses - Payroll - * -> Payroll; Expenses - Departmental Direct -
+        --      *, Undist. Op-Ex - * -> Operating Expenses; Expenses - Management
+        --      Fees - *, Expenses - Non-Operating - *, Interest Income - * ->
+        --      Below the Line / Other Income / (Expense) (as DAVIDSON 7000 / 7100).
+        --   2. Fallback (unmapped, or "Tierra Hotels Corporate EBITDA", a bucket),
+        --      by account block, each proven from the account names (build 26 M2):
+        --      5-digit chart: 41-49 Revenue; 54-59 COGS; 61 Payroll; 70, 74
+        --        Operating Expenses; 75 (management fees, rent incentive), 76005 /
+        --        76009 (interest), 85 (M&A), 91 (KSL / brand / restructuring), 94
+        --        (gains / losses) Below the Line / Other Income / (Expense) (Q-08);
+        --        76 depreciation / amortisation -> Depreciation & Amortization; 95
+        --        income tax -> Income Taxes; 99999 suspense -> Unclassified (Q-08).
+        --      Build rule (owner, pre-promotion), ahead of the mapping: a 5-digit
+        --        account whose title states depreciation / amortisation -> Below
+        --        the Line / Other Income / (Expense), overriding the iLevel mapping
+        --        and block 76, consistent with the Chilean chart and peer lanes.
+        --      7-digit Chilean chart (SAN, ATA, PAT, UNKNOWN): 41 ventas /
+        --        descuentos / servicios -> Revenue; 51 costo -> COGS; 61 sueldos /
+        --        remuneraciones -> Payroll; 62 gastos -> Operating Expenses, except
+        --        depreciacion / amortizacion / intereses titles (not proven by the
+        --        block; by title, as peers: Below the Line / Other Income /
+        --        (Expense), owner stop 4); 71, 77 (non-operating results,
+        --        FX, conversion) and 81 diferencia de cambio -> Below the Line /
+        --        Other Income / (Expense); 81 impuestos -> Income Taxes.
+        -- ====================================================================
+        merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
+        using (
+            with
+            -- ----------------------------------------------------------------
+            -- fact staging rows
+            -- ----------------------------------------------------------------
+            fact as (
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , ilevelmapping1 as m1, null::varchar as m2
+                from DEV_G2M_AI.STAGING.STG_BECKONS_ACTUALS
+                union all
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , ilevelmapping1 as m1, null::varchar as m2
+                from DEV_G2M_AI.STAGING.STG_BECKONS_BUDGET
+            )
+            -- ----------------------------------------------------------------
+            -- extract: one row per five-part key, attributes by MIN()
+            -- ----------------------------------------------------------------
+            , ext as (
+                select
+                      coalesce(nullif(trim(source_lane), ''), '~BLANK~')      as k_lane
+                    , coalesce(nullif(trim(source_site_code), ''), '~BLANK~') as k_site
+                    , coalesce(nullif(trim(department), ''), '~BLANK~')       as k_dept
+                    , coalesce(nullif(trim(account_key), ''), '~BLANK~')      as k_acct
+                    , coalesce(nullif(trim(record_type), ''), '~BLANK~')      as k_rtype
+                    , min(asset_name)                                         as asset_name
+                    , min(department_name)                                    as department_name
+                    , min(account_number)                                     as account_number
+                    , min(stat_account)                                       as stat_account
+                    , min(account_desc)                                       as account_desc
+                    , min(m1)                                                 as m1
+                    , min(m2)                                                 as m2
+                from fact
+                where 1=1
+                group by 1, 2, 3, 4, 5
+            )
+            , blk as (
+                select
+                      ext.*
+                    , iff(m1 is null or m1 = 'Tierra Hotels Corporate EBITDA', null, m1) as m_stated
+                    , length(k_acct) as a_len
+                    , left(k_acct, 2) as a_blk
+                    , upper(coalesce(account_desc, '')) as a_name
+                from ext
+            )
+            , cls as (
+                select
+                      blk.*
+                    , case
+                          when k_rtype = 'STATISTIC'                                       then 'Statistic|' || k_acct
+                          when a_len = 5 and (a_name like '%DEPRECIAT%' or a_name like '%AMORTIS%' or a_name like '%AMORTIZ%') then 'Below the Line|Other Income / (Expense)'
+                          when m_stated like 'Revenue - %'                                 then 'Revenue|Revenue'
+                          when m_stated like 'Expenses - Cost of Sales%'                   then 'Expense|Cost of Goods Sold'
+                          when m_stated like 'Expenses - Payroll%'                         then 'Expense|Payroll'
+                          when m_stated like 'Expenses - Departmental Direct%'
+                            or m_stated like 'Undist. Op-Ex%'                              then 'Expense|Operating Expenses'
+                          when m_stated like 'Expenses - Management Fees%'
+                            or m_stated like 'Expenses - Non-Operating%'
+                            or m_stated like 'Interest Income%'                            then 'Below the Line|Other Income / (Expense)'
+                          when m_stated is not null                                        then 'Unclassified|UNCLASSIFIED'
+                          when a_len = 5 and a_blk between '41' and '49'                   then 'Revenue|Revenue'
+                          when a_len = 5 and a_blk between '54' and '59'                   then 'Expense|Cost of Goods Sold'
+                          when a_len = 5 and a_blk = '61'                                  then 'Expense|Payroll'
+                          when a_len = 5 and a_blk in ('70', '74')                         then 'Expense|Operating Expenses'
+                          when a_len = 5 and k_acct in ('76005', '76009')                  then 'Below the Line|Other Income / (Expense)'
+                          when a_len = 5 and a_blk = '76'                                  then 'Expense|Depreciation & Amortization'
+                          when a_len = 5 and a_blk in ('75', '85', '91', '94')             then 'Below the Line|Other Income / (Expense)'
+                          when a_len = 5 and a_blk = '95'                                  then 'Below the Line|Income Taxes'
+                          when a_len = 7 and a_blk = '41'                                  then 'Revenue|Revenue'
+                          when a_len = 7 and a_blk = '51'                                  then 'Expense|Cost of Goods Sold'
+                          when a_len = 7 and a_blk = '61'                                  then 'Expense|Payroll'
+                          when a_len = 7 and a_blk = '62' and (a_name like '%DEPRECIAC%' or a_name like '%AMORTIZAC%' or a_name like '%INTERES%') then 'Below the Line|Other Income / (Expense)'
+                          when a_len = 7 and a_blk = '62'                                  then 'Expense|Operating Expenses'
+                          when a_len = 7 and a_blk = '81' and a_name like 'IMPUESTO%'      then 'Below the Line|Income Taxes'
+                          when a_len = 7 and a_blk in ('71', '77', '81')                   then 'Below the Line|Other Income / (Expense)'
+                          else 'Unclassified|UNCLASSIFIED'
+                      end as h12
+                    , case
+                          when k_rtype = 'STATISTIC'  then 'non-numeric ACCOUNT_NO (rooms / bed-night count): Statistic, H2 = the code (D-38)'
+                          when a_len = 5 and (a_name like '%DEPRECIAT%' or a_name like '%AMORTIS%' or a_name like '%AMORTIZ%') then 'title states depreciation / amortisation: Below the Line / Other Income / (Expense), overriding the iLevel mapping and block 76 (build rule, owner pre-promotion; as the Chilean chart and peers)'
+                          when m_stated is not null   then 'iLevel mapping ' || m_stated || ' (ILEVELMAPPING1; owner Q-09)'
+                          when k_acct = '99999'       then 'suspense account: not classified (owner Q-08)'
+                          when a_len = 7 and a_blk = '62' and (a_name like '%DEPRECIAC%' or a_name like '%AMORTIZAC%' or a_name like '%INTERES%') then 'Chilean block 62 (gastos), title states depreciation / amortisation / interest: Below the Line / Other Income / (Expense), as peers (owner stop 4)'
+                          when a_len in (5, 7)        then iff(m1 is null, 'no iLevel mapping', 'iLevel bucket Tierra Hotels Corporate EBITDA') || '; account block ' || a_blk || ' of the ' || a_len || '-digit chart, proven from account names (owner Q-08, Q-09)'
+                          else 'no mapping, no block: not classified'
+                      end as seed_source
+                from blk
+            )
+            , cls2 as (
+                select cls.*, split_part(h12, '|', 1) as h1, split_part(h12, '|', 2) as h2 from cls
+            )
+            select
+                  k_lane, k_site, k_dept, k_acct, k_rtype
+                , asset_name, department_name, account_number, stat_account, account_desc
+                , h1, h2
+                , 'UNCLASSIFIED' as h3
+                , 'UNCLASSIFIED' as h4
+                , 'UNCLASSIFIED' as h5
+                , case h2
+                      when 'Revenue'                     then 'Gross Profit'
+                      when 'Cost of Goods Sold'          then 'Gross Profit'
+                      when 'Payroll'                     then 'Operating'
+                      when 'Operating Expenses'          then 'Operating'
+                      when 'Depreciation & Amortization' then 'Operating'
+                      when 'Other Income / (Expense)'    then 'Non-Operating'
+                      when 'Income Taxes'                then 'Non-Operating'
+                  end as p_l_section
+                , case h2
+                      when 'Revenue'                     then 'Credit'
+                      when 'Cost of Goods Sold'          then 'Debit'
+                      when 'Payroll'                     then 'Debit'
+                      when 'Operating Expenses'          then 'Debit'
+                      when 'Depreciation & Amortization' then 'Debit'
+                      when 'Other Income / (Expense)'    then 'Mixed'
+                      when 'Income Taxes'                then 'Debit'
+                  end as normal_balance
+                , case h2
+                      when 'Revenue'                     then 1
+                      when 'Cost of Goods Sold'          then -1
+                      when 'Payroll'                     then -1
+                      when 'Operating Expenses'          then -1
+                      when 'Depreciation & Amortization' then -1
+                      when 'Income Taxes'                then -1
+                  end::number(2,0) as value_sign
+                , null::varchar as metric_unit
+                , iff(h1 = 'Statistic', 'UNRATIFIED', null)::varchar as aggregation_type
+                , seed_source
+            from cls2
+        ) src
+            on  tgt.source_lane      = src.k_lane
+            and tgt.source_site_code = src.k_site
+            and tgt.department       = src.k_dept
+            and tgt.account_key      = src.k_acct
+            and tgt.record_type      = src.k_rtype
+        when matched then update set
+              tgt.last_seen_run_id = :P_RUN_ID
+        when not matched then insert (
+              source_lane, source_site_code, department, account_key, record_type
+            , asset_name, department_name, account_number, stat_account, account_desc
+            , h1, h2, h3, h4, h5, p_l_section, normal_balance, value_sign
+            , metric_unit, aggregation_type, review_status, seed_source
+            , first_seen_run_id, last_seen_run_id
+        ) values (
+              src.k_lane, src.k_site, src.k_dept, src.k_acct, src.k_rtype
+            , src.asset_name, src.department_name, src.account_number, src.stat_account, src.account_desc
+            , src.h1, src.h2, src.h3, src.h4, src.h5, src.p_l_section, src.normal_balance, src.value_sign
+            , src.metric_unit, src.aggregation_type, 'UNREVIEWED', src.seed_source
+            , :P_RUN_ID, :P_RUN_ID
+        );
+
+    elseif (:P_LANE = 'HAI_HOSPITALITY') then
+        -- ====================================================================
+        -- LANE HAI_HOSPITALITY (build 26, new lane)
+        -- Facts: INCOME_STATEMENT (both branches). Key: site (HH_MST_LOC_KEY),
+        -- DEPARTMENT ~BLANK~, ACCOUNT_NUMBER, RECORD_TYPE AMOUNT.
+        -- H1 / H2 from the source's stated HIERARCHY_LEVEL_1 (build 26 M1):
+        --   GROSS SALES, SALES DISCOUNTS -> Revenue / Revenue (discounts are booked
+        --     negative, so VALUE reduces revenue; no contra sign needed);
+        --   COST OF GOODS SOLD -> Expense / Cost of Goods Sold;
+        --   SALARIES AND WAGES -> Expense / Payroll (4804-000 Employee Purchases
+        --     included, as the source states);
+        --   OPERATING EXPENSE, PRE-OPENING EXPENSE, GENERAL ADMINISTRATION,
+        --     OVERHEAD (an allocation netting to zero in the lane) -> Expense /
+        --     Operating Expenses;
+        --   DEPRECIATION AND AMORTIZATION EXPENSES -> Expense / Depreciation &
+        --     Amortization;
+        --   OTHER EXPENSES (interest), OTHER INCOME -> Below the Line / Other
+        --     Income / (Expense); INCOME TAXES -> Below the Line / Income Taxes.
+        -- ====================================================================
+        merge into DEV_G2M_AI.XREF_SNAPSHOT.XREF_ACCOUNT_CLASSIFICATION tgt
+        using (
+            with
+            -- ----------------------------------------------------------------
+            -- fact staging rows
+            -- ----------------------------------------------------------------
+            fact as (
+                select source_lane, source_site_code, department, account_key, record_type
+                     , asset_name, department_name, account_number, stat_account, account_desc
+                     , hierarchy_level_1 as m1, hierarchy_level_2 as m2
+                from DEV_G2M_AI.STAGING.STG_HAI_HOSPITALITY_INCOME_STATEMENT
+            )
+            -- ----------------------------------------------------------------
+            -- extract: one row per five-part key, attributes by MIN()
+            -- ----------------------------------------------------------------
+            , ext as (
+                select
+                      coalesce(nullif(trim(source_lane), ''), '~BLANK~')      as k_lane
+                    , coalesce(nullif(trim(source_site_code), ''), '~BLANK~') as k_site
+                    , coalesce(nullif(trim(department), ''), '~BLANK~')       as k_dept
+                    , coalesce(nullif(trim(account_key), ''), '~BLANK~')      as k_acct
+                    , coalesce(nullif(trim(record_type), ''), '~BLANK~')      as k_rtype
+                    , min(asset_name)                                         as asset_name
+                    , min(department_name)                                    as department_name
+                    , min(account_number)                                     as account_number
+                    , min(stat_account)                                       as stat_account
+                    , min(account_desc)                                       as account_desc
+                    , min(m1)                                                 as m1
+                    , min(m2)                                                 as m2
+                from fact
+                where 1=1
+                group by 1, 2, 3, 4, 5
+            )
+            , cls as (
+                select
+                      ext.*
+                    , case
+                          when m1 in ('GROSS SALES', 'SALES DISCOUNTS')                             then 'Revenue|Revenue'
+                          when m1 = 'COST OF GOODS SOLD'                                            then 'Expense|Cost of Goods Sold'
+                          when m1 = 'SALARIES AND WAGES'                                            then 'Expense|Payroll'
+                          when m1 in ('OPERATING EXPENSE', 'PRE-OPENING EXPENSE', 'GENERAL ADMINISTRATION', 'OVERHEAD') then 'Expense|Operating Expenses'
+                          when m1 = 'DEPRECIATION AND AMORTIZATION EXPENSES'                        then 'Expense|Depreciation & Amortization'
+                          when m1 in ('OTHER EXPENSES', 'OTHER INCOME')                             then 'Below the Line|Other Income / (Expense)'
+                          when m1 = 'INCOME TAXES'                                                  then 'Below the Line|Income Taxes'
+                          else 'Unclassified|UNCLASSIFIED'
+                      end as h12
+                    , iff(m1 is null, 'no HIERARCHY_LEVEL_1: not classified', 'source HIERARCHY_LEVEL_1 ' || m1 || ' / ' || coalesce(m2, '~BLANK~') || ' (build 26 M1)') as seed_source
+                from ext
+            )
+            , cls2 as (
+                select cls.*, split_part(h12, '|', 1) as h1, split_part(h12, '|', 2) as h2 from cls
+            )
+            select
+                  k_lane, k_site, k_dept, k_acct, k_rtype
+                , asset_name, department_name, account_number, stat_account, account_desc
+                , h1, h2
+                , 'UNCLASSIFIED' as h3
+                , 'UNCLASSIFIED' as h4
+                , 'UNCLASSIFIED' as h5
+                , case h2
+                      when 'Revenue'                     then 'Gross Profit'
+                      when 'Cost of Goods Sold'          then 'Gross Profit'
+                      when 'Payroll'                     then 'Operating'
+                      when 'Operating Expenses'          then 'Operating'
+                      when 'Depreciation & Amortization' then 'Operating'
+                      when 'Other Income / (Expense)'    then 'Non-Operating'
+                      when 'Income Taxes'                then 'Non-Operating'
+                  end as p_l_section
+                , case h2
+                      when 'Revenue'                     then 'Credit'
+                      when 'Cost of Goods Sold'          then 'Debit'
+                      when 'Payroll'                     then 'Debit'
+                      when 'Operating Expenses'          then 'Debit'
+                      when 'Depreciation & Amortization' then 'Debit'
+                      when 'Other Income / (Expense)'    then 'Mixed'
+                      when 'Income Taxes'                then 'Debit'
+                  end as normal_balance
+                , case h2
+                      when 'Revenue'                     then 1
+                      when 'Cost of Goods Sold'          then -1
+                      when 'Payroll'                     then -1
+                      when 'Operating Expenses'          then -1
+                      when 'Depreciation & Amortization' then -1
+                      when 'Income Taxes'                then -1
+                  end::number(2,0) as value_sign
+                , null::varchar as metric_unit
+                , iff(h1 = 'Statistic', 'UNRATIFIED', null)::varchar as aggregation_type
+                , seed_source
+            from cls2
+        ) src
+            on  tgt.source_lane      = src.k_lane
+            and tgt.source_site_code = src.k_site
+            and tgt.department       = src.k_dept
+            and tgt.account_key      = src.k_acct
+            and tgt.record_type      = src.k_rtype
+        when matched then update set
+              tgt.last_seen_run_id = :P_RUN_ID
+        when not matched then insert (
+              source_lane, source_site_code, department, account_key, record_type
+            , asset_name, department_name, account_number, stat_account, account_desc
+            , h1, h2, h3, h4, h5, p_l_section, normal_balance, value_sign
+            , metric_unit, aggregation_type, review_status, seed_source
+            , first_seen_run_id, last_seen_run_id
+        ) values (
+              src.k_lane, src.k_site, src.k_dept, src.k_acct, src.k_rtype
+            , src.asset_name, src.department_name, src.account_number, src.stat_account, src.account_desc
+            , src.h1, src.h2, src.h3, src.h4, src.h5, src.p_l_section, src.normal_balance, src.value_sign
+            , src.metric_unit, src.aggregation_type, 'UNREVIEWED', src.seed_source
+            , :P_RUN_ID, :P_RUN_ID
+        );
+
     else
         raise e_lane;
     end if;
